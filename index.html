@@ -1,14 +1,249 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Parser Test</title>
+    <meta charset="UTF-8">
+    <title>REWE E-Bon Parser Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #333;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        #output {
+            background: #f4f4f4;
+            padding: 20px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+        }
+        
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
-    <h1>REWE E-Bon Parser Test</h1>
-    <button onclick="testParser()">Test Parser</button>
-    <pre id="output"></pre>
+    <h1>🛒 REWE E-Bon Parser Test</h1>
+    
+    <div class="section">
+        <h2>Test mit Beispiel-Bon</h2>
+        <button onclick="testParser()">Test mit Standard-Bon</button>
+        <button onclick="clearOutput()">Output löschen</button>
+    </div>
+    
+    <div class="section">
+        <h2>Test mit eigenem Text</h2>
+        <textarea id="customContent" placeholder="Fügen Sie hier einen E-Bon Text ein...">Michael Brücken Kaufpark GmbH&Co.oHG
+Gewerbestraße 2
+58256 Ennepetal
+Tel.: 02333/974571
+UID Nr.: DE170095254
+EUR
+KALINKA KEFIR 1,29 B
+PFAND 0,25 EURO 0,25 B
+FR.KAROTT+KARTOF 1,25 B
+KAROT.KART.RIND 1,65 B
+--------------------------------------
+SUMME EUR 4,44
+======================================
+Geg. EC-Cash EUR 54,44
+AUSZAHLUNG EUR 50,00</textarea>
+        <button onclick="testCustomParser()">Test mit eigenem Text</button>
+    </div>
+    
+    <div class="section">
+        <h2>Parser Output:</h2>
+        <pre id="output">Klicken Sie auf einen Test-Button...</pre>
+    </div>
 
     <script>
+        function categorizeProduct(productName) {
+            const upperName = productName.toUpperCase();
+            
+            // Simplified category mapping for testing
+            if (upperName.includes('KEFIR') || upperName.includes('MILCH') || upperName.includes('JOGHURT')) {
+                return 'Milchprodukte';
+            }
+            if (upperName.includes('PFAND')) {
+                return 'Pfand';
+            }
+            if (upperName.includes('KAROTT') || upperName.includes('KARTOF')) {
+                return 'Obst & Gemüse';
+            }
+            if (upperName.includes('RIND') || upperName.includes('FLEISCH')) {
+                return 'Babynahrung';
+            }
+            return 'Sonstiges';
+        }
+
+        function parseEBon(content, fileName) {
+            const output = [];
+            output.push(`=== Parsing ${fileName} ===`);
+            
+            // Extract date from filename
+            const dateMatch = fileName.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+            if (!dateMatch) {
+                output.push('❌ No date found in filename');
+                updateOutput(output.join('\n'), false);
+                return null;
+            }
+            
+            const date = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+            output.push(`✓ Date: ${date}`);
+            
+            // Clean up content
+            content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            output.push(`✓ Content length: ${content.length} characters`);
+            
+            // Parse REWE e-bon format
+            const lines = content.split('\n').map(line => line.trim());
+            output.push(`✓ Total lines: ${lines.length}`);
+            
+            const items = [];
+            let total = 0;
+            let store = 'REWE Ennepetal';
+            let inProductSection = false;
+            
+            // Process each line
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                if (!line) continue;
+                
+                // Start of product section
+                if (line === 'EUR' || line.endsWith('EUR')) {
+                    output.push(`✓ Found EUR marker at line ${i + 1}: "${line}"`);
+                    inProductSection = true;
+                    continue;
+                }
+                
+                // End of product section
+                if (line.includes('---') || line.includes('SUMME')) {
+                    output.push(`✓ Found end marker at line ${i + 1}: "${line}"`);
+                    if (line.includes('SUMME')) {
+                        const totalMatch = line.match(/(\d+[,\.]\d{2})/);
+                        if (totalMatch) {
+                            total = parseFloat(totalMatch[1].replace(',', '.'));
+                            output.push(`✓ Found total: ${total}€`);
+                        }
+                    }
+                    inProductSection = false;
+                    break;
+                }
+                
+                if (!inProductSection) continue;
+                
+                // Try to match product lines
+                // Pattern 1: PRODUCT NAME PRICE [A/B]
+                let match = line.match(/^(.+?)\s+(\d+[,\.]\d{2})\s*([AB])?\s*$/);
+                
+                if (match) {
+                    const productName = match[1].trim();
+                    const price = parseFloat(match[2].replace(',', '.'));
+                    const taxCategory = match[3] || '';
+                    
+                    output.push(`✓ Found product at line ${i + 1}: "${productName}" - ${price}€ [${taxCategory}]`);
+                    
+                    // Skip invalid entries
+                    if (productName.includes('=') || 
+                        productName.includes('%') ||
+                        productName.includes('Steuer') ||
+                        productName.includes('AUSZAHLUNG') ||
+                        productName.includes('Geg.') ||
+                        price <= 0 ||
+                        price > 1000) {
+                        output.push(`  ⚠️ Skipping invalid product`);
+                        continue;
+                    }
+                    
+                    const category = categorizeProduct(productName);
+                    items.push({
+                        name: productName.toUpperCase(),
+                        price: price,
+                        quantity: 1,
+                        unitPrice: price,
+                        category: category
+                    });
+                    output.push(`  → Added to category: ${category}`);
+                } else if (inProductSection && line.length > 0) {
+                    output.push(`⚠️ Unmatched line ${i + 1}: "${line}"`);
+                }
+            }
+            
+            output.push(`\n✓ Found ${items.length} valid items`);
+            
+            if (items.length === 0) {
+                output.push('❌ No items found, returning null');
+                updateOutput(output.join('\n'), false);
+                return null;
+            }
+            
+            // If no total found, calculate from items
+            if (!total || total === 0) {
+                total = items.reduce((sum, item) => sum + item.price, 0);
+                output.push(`✓ Calculated total: ${total}€`);
+            }
+            
+            const receipt = {
+                date: date,
+                store: store,
+                total: total,
+                items: items
+            };
+            
+            output.push('\n✅ Successfully parsed receipt:');
+            output.push(JSON.stringify(receipt, null, 2));
+            
+            updateOutput(output.join('\n'), true);
+            return receipt;
+        }
+
         function testParser() {
             const testContent = `Michael Brücken Kaufpark GmbH&Co.oHG
 Gewerbestraße 2
@@ -22,20 +257,37 @@ FR.KAROTT+KARTOF 1,25 B
 KAROT.KART.RIND 1,65 B
 --------------------------------------
 SUMME EUR 4,44
-======================================`;
+======================================
+Geg. EC-Cash EUR 54,44
+AUSZAHLUNG EUR 50,00
 
-            const result = parseEBon(testContent, 'Test vom 02.08.2025.docx');
-            document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+* * Kundenbeleg * *
+Datum: 02.08.2025
+Uhrzeit: 13:49:26 Uhr`;
+
+            parseEBon(testContent, 'Test vom 02.08.2025.docx');
         }
 
-        function parseEBon(content, fileName) {
-            // Ihr Parser-Code hier
-            // ... (den gleichen Code wie in der Haupt-App)
+        function testCustomParser() {
+            const customContent = document.getElementById('customContent').value;
+            parseEBon(customContent, 'Custom vom 01.01.2025.docx');
         }
 
-        function categorizeProduct(name) {
-            return 'Test';
+        function updateOutput(text, success) {
+            const output = document.getElementById('output');
+            output.textContent = text;
+            output.className = success ? 'success' : 'error';
         }
+
+        function clearOutput() {
+            document.getElementById('output').textContent = 'Klicken Sie auf einen Test-Button...';
+            document.getElementById('output').className = '';
+        }
+
+        // Auto-test on load
+        window.onload = function() {
+            console.log('Parser Test loaded. Click a button to test.');
+        };
     </script>
 </body>
 </html>
