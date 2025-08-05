@@ -585,7 +585,8 @@
                 'KOPFSALAT', 'FELDSALAT', 'LAUCHZWIEBEL', 'INGWER', 'KNOBLAUCH',
                 'PORREE', 'CHAMPIGNON', 'AUBERGINE', 'ZUCCHINI', 'BROKKOLI', 'KOHLRABI',
                 'KUERBIS', 'TOMATE', 'GURKE', 'ERDBEERE', 'BLAUBEERE', 'WEINTRAUBE',
-                'BIRNE', 'PFLAUME', 'SALAT', 'SPINAT', 'RUCOLA', 'RADIESCHEN'
+                'BIRNE', 'PFLAUME', 'SALAT', 'SPINAT', 'RUCOLA', 'RADIESCHEN',
+                'KAROTT', 'KARTOF', 'FR.KAROTT'
             ],
             'Fleisch & Wurst': [
                 'FLEISCHWURST', 'WIENER', 'HACKFLEISCH', 'PUTENBRUST', 'BRATWURST',
@@ -601,7 +602,8 @@
                 'CREME FRAICHE', 'MILCH', 'SAHNE', 'FRUCHTQUARK', 'DICKMILCH',
                 'KEFIR', 'STREICHFETT', 'CAMEMBERT', 'FRISCHKAESE', 'PHILADELPHIA',
                 'ALMETTE', 'GERAMONT', 'BEEMSTER', 'CAMPINA', 'WESTLITE', 'GRAEDDOST',
-                'BUTTERMILCH', 'SCHMAND', 'MASCARPONE', 'RICOTTA', 'PARMESAN'
+                'BUTTERMILCH', 'SCHMAND', 'MASCARPONE', 'RICOTTA', 'PARMESAN',
+                'KALINKA'
             ],
             'Backwaren': [
                 'DINKELMEHL', 'DINKEL-BROETCHEN', 'BROT', 'BROETCHEN', 'TOAST',
@@ -612,9 +614,12 @@
             'Getränke': [
                 'COCA COLA', 'SCHLOSSQU', 'VITAMIN SAFT', 'APFELSAFT', 'ORANGENSAFT',
                 'KAFFEE', 'TEE', 'WASSER', 'LEMONAID', 'KAKAO', 'MULTI', 'ENERGY',
-                'PFAND', 'LEERG', 'SAFT', 'GETRAENK', 'LIMONADE', 'BIER', 'VELTINS',
+                'SAFT', 'GETRAENK', 'LIMONADE', 'BIER', 'VELTINS',
                 'FIEGE', 'LANDPARK', 'KROM', 'MINERALWASSER', 'SPRUDEL', 'EISTEE',
                 'SMOOTHIE', 'MILCHSHAKE', 'TRAUBENSAFT', 'KIRSCHSAFT', 'ANANASSAFT'
+            ],
+            'Pfand': [
+                'PFAND', 'LEERG', 'EINWEG', 'MEHRWEG'
             ],
             'Süßwaren & Snacks': [
                 'SCHOKOLADE', 'HARIBO', 'KINDER', 'DUPLO', 'KITKAT', 'LION',
@@ -648,6 +653,10 @@
                 'TK-', 'TIEFKUEHL', 'EISBERGSALAT TK', 'SPINAT TK', 'ERBSEN TK',
                 'POMMES', 'KROKETTEN', 'FISCHFILET TK', 'GARNELEN TK', 'BEEREN TK',
                 'GEMUESE TK', 'KRAEUTERMIX TK', 'FERTIGGERICHT TK', 'EIS', 'SPEISEEIS'
+            ],
+            'Babynahrung': [
+                'KAROT.KART.RIND', 'BABYGLAS', 'HIPP', 'ALETE', 'BEBIVITA',
+                'BABYBREI', 'FOLGEMILCH', 'ANFANGSMILCH', 'BABYKEKS'
             ],
             'Fisch & Meeresfrüchte': [
                 'LACHS', 'FORELLE', 'THUNFISCH', 'GARNELE', 'KRABBEN', 'MUSCHELN',
@@ -910,60 +919,120 @@
             
             const date = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
             
-            // Basic parsing logic - this needs to be adapted to actual REWE e-bon format
-            const lines = content.split('\n');
+            // Clean up content - remove special characters and normalize
+            content = content.replace(/~/g, '\n').replace(/\\/g, '').replace(/\*/g, '');
+            
+            // Parse REWE e-bon format
+            const lines = content.split('\n').map(line => line.trim());
             const items = [];
             let total = 0;
             let store = 'REWE';
+            let productSectionStarted = false;
+            let productSectionEnded = false;
             
-            // Look for store name
-            const storeMatch = content.match(/REWE\s+([^\n]+)/);
-            if (storeMatch) {
-                store = 'REWE ' + storeMatch[1].trim();
+            // Look for store info
+            const storeNameMatch = content.match(/Michael Brücken Kaufpark|REWE[^\\n]+/);
+            if (storeNameMatch) {
+                store = 'REWE Ennepetal';
             }
             
-            // Parse items - this is a simplified version
-            // You'll need to adapt this to the actual format of your e-bons
+            // Process each line
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
+                const line = lines[i];
                 
-                // Skip empty lines and headers
-                if (!line || line.includes('REWE') || line.includes('Bon') || line.includes('====')) {
+                // Skip empty lines
+                if (!line) continue;
+                
+                // Check if we've reached the end of products (SUMME line)
+                if (line.includes('----') || line.includes('SUMME')) {
+                    productSectionEnded = true;
+                    
+                    // Extract total from SUMME line
+                    if (line.includes('SUMME')) {
+                        const totalMatch = line.match(/(\d+[,\.]\d{2})/);
+                        if (totalMatch) {
+                            total = parseFloat(totalMatch[1].replace(',', '.'));
+                        }
+                    }
                     continue;
                 }
                 
-                // Look for product lines (this pattern needs to be adjusted)
-                const priceMatch = line.match(/(\d+[,\.]\d{2})\s*€?$/);
-                if (priceMatch) {
-                    const price = parseFloat(priceMatch[1].replace(',', '.'));
-                    const productName = line.replace(priceMatch[0], '').trim();
-                    
-                    if (productName && price > 0) {
-                        items.push({
-                            name: productName.toUpperCase(),
-                            price: price,
-                            quantity: 1,
-                            category: categorizeProduct(productName)
-                        });
-                        total += price;
-                    }
+                // Skip lines after product section
+                if (productSectionEnded) continue;
+                
+                // Start product section after EUR header
+                if (line === 'EUR' || line.endsWith('EUR')) {
+                    productSectionStarted = true;
+                    continue;
                 }
                 
-                // Look for total
-                if (line.includes('SUMME') || line.includes('GESAMT')) {
-                    const totalMatch = line.match(/(\d+[,\.]\d{2})/);
-                    if (totalMatch) {
-                        total = parseFloat(totalMatch[1].replace(',', '.'));
+                // Only process lines in product section
+                if (!productSectionStarted) continue;
+                
+                // Parse product lines
+                // Format: PRODUCT NAME PRICE [A/B]
+                // Match price pattern at end of line with optional tax category
+                const productMatch = line.match(/^(.+?)\s+(\d+[,\.]\d{2})\s*([AB])?\s*$/);
+                
+                if (productMatch) {
+                    let productName = productMatch[1].trim();
+                    const price = parseFloat(productMatch[2].replace(',', '.'));
+                    
+                    // Skip if it's not a valid product
+                    if (productName.includes('=') || 
+                        productName.includes('%') ||
+                        productName.includes('Steuer') ||
+                        productName.includes('Netto') ||
+                        productName.includes('Brutto') ||
+                        productName.includes('Gesamtbetrag') ||
+                        productName.includes('AUSZAHLUNG') ||
+                        productName.includes('EC-Cash') ||
+                        productName.includes('Geg.') ||
+                        price <= 0 ||
+                        price > 1000) {
+                        continue;
                     }
+                    
+                    // Special handling for PFAND (deposit)
+                    if (productName.includes('PFAND')) {
+                        productName = 'PFAND';
+                    }
+                    
+                    // Check if next line contains quantity info (for weighted items)
+                    let quantity = 1;
+                    let unitPrice = price;
+                    
+                    if (i + 1 < lines.length) {
+                        const nextLine = lines[i + 1];
+                        const quantityMatch = nextLine.match(/(\d+[,\.]\d+)\s*(kg|stk|st|g|l|ml)?\s*x\s*(\d+[,\.]\d+)/i);
+                        if (quantityMatch) {
+                            quantity = parseFloat(quantityMatch[1].replace(',', '.'));
+                            unitPrice = parseFloat(quantityMatch[3].replace(',', '.'));
+                            i++; // Skip the quantity line
+                        }
+                    }
+                    
+                    items.push({
+                        name: productName.toUpperCase(),
+                        price: price,
+                        quantity: quantity,
+                        unitPrice: unitPrice,
+                        category: categorizeProduct(productName)
+                    });
                 }
             }
             
             if (items.length === 0) return null;
             
+            // If no total found, calculate from items
+            if (!total || total === 0) {
+                total = items.reduce((sum, item) => sum + item.price, 0);
+            }
+            
             return {
                 date: date,
                 store: store,
-                total: total || items.reduce((sum, item) => sum + item.price, 0),
+                total: total,
                 items: items
             };
         }
