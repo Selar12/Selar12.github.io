@@ -1005,7 +1005,7 @@
                 }
                 
                 // End of product section
-                if (line.includes('---') || line.includes('SUMME')) {
+                if (line.includes('---') || line.includes('===') || line.includes('SUMME')) {
                     console.log('Found end marker, ending product section');
                     if (line.includes('SUMME')) {
                         const totalMatch = line.match(/(\d+[,\.]\d{2})/);
@@ -1019,52 +1019,73 @@
                 
                 if (!inProductSection) continue;
                 
+                // Skip lines that are clearly not products
+                if (line.includes('Handeingabe') || 
+                    line.includes('E-Bon') ||
+                    line.includes('=') ||
+                    line.includes('%') ||
+                    line.includes('Steuer') ||
+                    line.includes('AUSZAHLUNG') ||
+                    line.includes('Geg.') ||
+                    line.includes('EC-Cash')) {
+                    console.log(`Skipping non-product line: ${line}`);
+                    continue;
+                }
+                
                 // Try different patterns to match products
-                // Pattern 1: PRODUCT NAME PRICE [A/B]
                 let matched = false;
                 
-                // First try: Standard format with tax category
-                let match = line.match(/^(.+?)\s+(\d+[,\.]\d{2})\s*([AB])?$/);
-                
-                // Second try: Format with EUR in line
-                if (!match) {
-                    match = line.match(/^(.+?)\s+EUR\s+(\d+[,\.]\d{2})\s*([AB])?$/);
-                }
-                
-                // Third try: More flexible pattern
-                if (!match) {
-                    match = line.match(/^(.+?)\s+(\d+[,\.]\d{2})(?:\s+EUR)?\s*([AB])?$/);
-                }
+                // Pattern 1: PRODUCT NAME PRICE [A/B]
+                let match = line.match(/^(.+?)\s+(\d+[,\.]\d{2})\s*([AB])?\s*$/);
                 
                 if (match) {
                     const productName = match[1].trim();
                     const price = parseFloat(match[2].replace(',', '.'));
+                    const taxCategory = match[3] || '';
                     
-                    console.log(`Found product: ${productName} - ${price}€`);
+                    console.log(`Found product: ${productName} - ${price}€ [${taxCategory}]`);
                     
-                    // Skip invalid entries
-                    if (productName.includes('=') || 
-                        productName.includes('%') ||
-                        productName.includes('Steuer') ||
-                        productName.includes('AUSZAHLUNG') ||
-                        productName.includes('Geg.') ||
-                        price <= 0 ||
-                        price > 1000) {
-                        console.log('Skipping invalid product');
-                        continue;
+                    // Check if this looks like a valid product
+                    if (price > 0 && price < 1000 && productName.length > 1) {
+                        let quantity = 1;
+                        let unitPrice = price;
+                        
+                        // Look ahead for quantity information
+                        if (i + 1 < lines.length) {
+                            const nextLine = lines[i + 1];
+                            // Skip "Handeingabe E-Bon" lines
+                            let quantityLineIndex = i + 1;
+                            if (nextLine.includes('Handeingabe') || nextLine.includes('E-Bon')) {
+                                quantityLineIndex = i + 2;
+                            }
+                            
+                            if (quantityLineIndex < lines.length) {
+                                const quantityLine = lines[quantityLineIndex];
+                                // Match patterns like "1,206 kg x 1,99 EUR/kg" or "0,204 kg"
+                                const quantityMatch = quantityLine.match(/(\d+[,\.]\d+)\s*(kg|stk|st|g|l|ml)(?:\s*x\s*(\d+[,\.]\d+)\s*EUR)?/i);
+                                if (quantityMatch) {
+                                    quantity = parseFloat(quantityMatch[1].replace(',', '.'));
+                                    if (quantityMatch[3]) {
+                                        unitPrice = parseFloat(quantityMatch[3].replace(',', '.'));
+                                    }
+                                    console.log(`  Found quantity: ${quantity} @ ${unitPrice}€/unit`);
+                                    i = quantityLineIndex; // Skip the processed lines
+                                }
+                            }
+                        }
+                        
+                        items.push({
+                            name: productName.toUpperCase(),
+                            price: price,
+                            quantity: quantity,
+                            unitPrice: unitPrice,
+                            category: categorizeProduct(productName)
+                        });
+                        matched = true;
                     }
-                    
-                    items.push({
-                        name: productName.toUpperCase(),
-                        price: price,
-                        quantity: 1,
-                        unitPrice: price,
-                        category: categorizeProduct(productName)
-                    });
-                    matched = true;
                 }
                 
-                if (!matched && line.length > 0 && !line.includes('*')) {
+                if (!matched && line.length > 0 && !line.match(/^\d+[,\.]\d+\s*(kg|stk|st|g|l|ml)/)) {
                     console.log('Unmatched line:', line);
                 }
             }
@@ -1072,15 +1093,24 @@
             console.log(`Found ${items.length} items`);
             console.log('Items:', items);
             
+            // If we found the first item's price as total, look for actual total
+            if (items.length > 0 && total === items[0].price) {
+                console.log('Total was first item price, looking for actual total...');
+                // Search for actual total in remaining content
+                const totalMatch = content.match(/SUMME\s+EUR\s+(\d+[,\.]\d{2})/);
+                if (totalMatch) {
+                    total = parseFloat(totalMatch[1].replace(',', '.'));
+                    console.log('Found actual total:', total);
+                } else {
+                    // Calculate total from items
+                    total = items.reduce((sum, item) => sum + item.price, 0);
+                    console.log('Calculated total from items:', total);
+                }
+            }
+            
             if (items.length === 0) {
                 console.log('No items found, returning null');
                 return null;
-            }
-            
-            // If no total found, calculate from items
-            if (!total || total === 0) {
-                total = items.reduce((sum, item) => sum + item.price, 0);
-                console.log('Calculated total:', total);
             }
             
             const receipt = {
