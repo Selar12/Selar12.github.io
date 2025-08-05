@@ -983,157 +983,161 @@
             // Remove BOM if present
             content = content.replace(/^\ufeff/, '');
             
-            console.log('Content preview:', content.substring(0, 400));
+            console.log('Content length:', content.length);
             
             // Split content into lines
             let lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
             
-            console.log(`Original lines count: ${lines.length}`);
-            console.log('First 10 lines:', lines.slice(0, 10));
-            
-            // Find EUR marker and handle inline products
-            for (let i = 0; i < lines.length; i++) {
-                // Check if line contains EUR followed by product info
-                if (lines[i].includes(' EUR ') && !lines[i].includes('EUR/') && !lines[i].includes('SUMME')) {
-                    const eurMatch = lines[i].match(/^(.*?EUR)\s+(.+)$/);
-                    if (eurMatch) {
-                        const before = eurMatch[1].trim();
-                        const after = eurMatch[2].trim();
-                        console.log(`Splitting line ${i}: "${lines[i]}"`);
-                        console.log(`  Into: "${before}" and "${after}"`);
-                        lines[i] = before;
-                        lines.splice(i + 1, 0, after);
-                    }
-                }
-            }
-            
-            console.log(`Lines after splitting: ${lines.length}`);
+            console.log(`Total lines: ${lines.length}`);
+            console.log('First 15 lines:', lines.slice(0, 15).map((l, i) => `${i}: ${l}`));
             
             const items = [];
             let total = 0;
             let store = 'REWE';
             let inProductSection = false;
+            let productSectionStart = -1;
+            let productSectionEnd = -1;
             
             // Look for store info
             if (content.includes('Ennepetal')) {
                 store = 'REWE Ennepetal';
             } else if (content.includes('Breckerfeld')) {
                 store = 'REWE Breckerfeld';
+            } else if (content.includes('Hagen')) {
+                store = 'REWE Hagen';
             }
             
-            // Process each line
+            // Find product section boundaries
+            // Products typically start after store info and EUR marker
+            // and end before payment info or separator lines
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
                 
-                console.log(`Processing line ${i}: "${line}"`);
-                
-                // Start of product section
-                if ((line === 'EUR' || line.endsWith(' EUR') || line === 'EUR EUR') && !inProductSection) {
-                    console.log(`  → EUR marker found, starting product section`);
+                // Look for start of products (EUR line or first product after store info)
+                if (!inProductSection && 
+                    (line === 'EUR' || 
+                     line.match(/^EUR\s+[A-Z]/) || 
+                     (i > 2 && line.match(/^[A-Z][A-Z\s]+\s+\d+[,\.]\d{2}\s*[AB]?$/)))) {
+                    productSectionStart = i;
                     inProductSection = true;
-                    continue;
+                    console.log(`Product section starts at line ${i}: "${line}"`);
                 }
                 
-                // End of product section
-                if (inProductSection && (line.includes('---') || line.includes('===') || line.includes('SUMME'))) {
-                    console.log(`  → End marker found, ending product section`);
+                // Look for end of products
+                if (inProductSection && 
+                    (line.includes('----') || 
+                     line.includes('====') || 
+                     line.includes('SUMME') ||
+                     line.includes('* *') ||
+                     line.includes('Kundenbeleg') ||
+                     line.includes('Geg.') ||
+                     line.includes('EC-Cash'))) {
+                    productSectionEnd = i;
+                    console.log(`Product section ends at line ${i}: "${line}"`);
+                    
+                    // Check for total
                     if (line.includes('SUMME')) {
                         const totalMatch = line.match(/(\d+[,\.]\d{2})/);
                         if (totalMatch) {
                             total = parseFloat(totalMatch[1].replace(',', '.'));
-                            console.log(`  → Total found: ${total}`);
+                            console.log(`Found total: ${total}`);
                         }
                     }
-                    inProductSection = false;
                     break;
                 }
+            }
+            
+            // If no clear boundaries found, scan entire document for products
+            if (productSectionStart === -1) {
+                console.log('No clear product section found, scanning entire document');
+                productSectionStart = 0;
+                productSectionEnd = lines.length;
+            }
+            
+            console.log(`Processing lines ${productSectionStart} to ${productSectionEnd}`);
+            
+            // Process product lines
+            for (let i = productSectionStart; i < productSectionEnd && i < lines.length; i++) {
+                let line = lines[i];
                 
-                if (!inProductSection) {
-                    console.log(`  → Skipped (not in product section)`);
-                    continue;
+                // Handle EUR prefix
+                if (line.startsWith('EUR ')) {
+                    line = line.substring(4);
                 }
+                
+                console.log(`\nLine ${i}: "${line}"`);
                 
                 // Skip non-product lines
                 if (line.includes('Handeingabe') || 
                     line.includes('E-Bon') ||
+                    line === 'EUR' ||
                     line === 'B' || 
                     line === 'A' ||
+                    line.includes('Steuer') ||
+                    line.includes('Netto') ||
+                    line.includes('Brutto') ||
+                    line.includes('=') ||
+                    line.includes('%') ||
                     line.length < 3) {
-                    console.log(`  → Skipped (non-product line)`);
+                    console.log(`  → Skipped (non-product)`);
                     continue;
                 }
                 
-                // Try to match product lines
-                // Pattern: PRODUCT NAME PRICE [A/B]
-                const productMatch = line.match(/^(.+?)\s+(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
+                // Try to match product pattern: NAME PRICE [TAX]
+                const productMatch = line.match(/^([A-Z][A-Z\s\.\+\-\/&]+?)\s+(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
                 
                 if (productMatch) {
                     const productName = productMatch[1].trim();
                     const price = parseFloat(productMatch[2].replace(',', '.'));
-                    const taxCategory = productMatch[3] || '';
+                    const taxCategory = productMatch[3] || 'B';
                     
-                    console.log(`  → MATCHED PRODUCT: "${productName}" - ${price}€ [${taxCategory}]`);
+                    console.log(`  → MATCHED: "${productName}" - ${price}€ [${taxCategory}]`);
                     
-                    // Validate product
-                    if (price > 0 && price < 1000 && productName.length > 1 &&
-                        !productName.includes('=') && !productName.includes('%')) {
-                        
+                    if (price > 0 && price < 1000 && productName.length > 1) {
                         let quantity = 1;
                         let unitPrice = price;
                         
-                        // Look for quantity info in next lines
-                        let j = i + 1;
+                        // Look for quantity in next lines
                         let foundQuantity = false;
-                        
-                        while (j < lines.length && j <= i + 3) {
+                        for (let j = i + 1; j < Math.min(i + 4, productSectionEnd); j++) {
                             const nextLine = lines[j];
-                            console.log(`    Checking next line ${j} for quantity: "${nextLine}"`);
                             
-                            // Skip non-quantity lines
                             if (nextLine.includes('Handeingabe') || nextLine.includes('E-Bon')) {
-                                j++;
                                 continue;
                             }
                             
-                            // Check for quantity pattern with kg/g/ml
-                            const quantityMatch = nextLine.match(/^(\d+[,\.]\d+)\s*(kg|stk|st|g|l|ml)(?:\s*x\s*(\d+[,\.]\d+))?/i);
-                            if (quantityMatch) {
-                                quantity = parseFloat(quantityMatch[1].replace(',', '.'));
-                                if (quantityMatch[3]) {
-                                    unitPrice = parseFloat(quantityMatch[3].replace(',', '.'));
+                            // Weight pattern: "0,637 kg" or "1,124 kg x 2,29 EUR/kg"
+                            const weightMatch = nextLine.match(/^(\d+[,\.]\d+)\s*(kg|g|l|ml)(?:\s*x\s*(\d+[,\.]\d+)\s*EUR)?/i);
+                            if (weightMatch) {
+                                quantity = parseFloat(weightMatch[1].replace(',', '.'));
+                                if (weightMatch[3]) {
+                                    unitPrice = parseFloat(weightMatch[3].replace(',', '.'));
                                 }
-                                console.log(`    → Found quantity: ${quantity} @ ${unitPrice}€/unit`);
-                                i = j; // Skip processed lines
+                                console.log(`    → Weight: ${quantity} ${weightMatch[2]} @ ${unitPrice}€/unit`);
                                 foundQuantity = true;
+                                i = j;
                                 break;
                             }
                             
-                            // Check for simple quantity pattern (e.g., "4 Stk x 1,00")
-                            const simpleQtyMatch = nextLine.match(/^(\d+)\s*(Stk|stk|STK)?\s*x\s*(\d+[,\.]\d+)$/);
-                            if (simpleQtyMatch) {
-                                quantity = parseInt(simpleQtyMatch[1]);
-                                unitPrice = parseFloat(simpleQtyMatch[3].replace(',', '.'));
-                                console.log(`    → Found simple quantity: ${quantity} @ ${unitPrice}€/unit`);
-                                i = j; // Skip processed lines
+                            // Piece pattern: "2 Stk x 1,05"
+                            const pieceMatch = nextLine.match(/^(\d+)\s*(Stk|stk|STK)?\s*x\s*(\d+[,\.]\d+)$/);
+                            if (pieceMatch) {
+                                quantity = parseInt(pieceMatch[1]);
+                                unitPrice = parseFloat(pieceMatch[3].replace(',', '.'));
+                                console.log(`    → Pieces: ${quantity} @ ${unitPrice}€/unit`);
                                 foundQuantity = true;
+                                i = j;
                                 break;
                             }
                             
-                            // If line looks like a new product, stop looking for quantity
-                            if (nextLine.match(/^.+?\s+\d+[,\.]\d{2}/) || nextLine.includes('---')) {
-                                console.log(`    → Next line looks like new product or separator, stopping`);
+                            // Stop if next line looks like a product
+                            if (nextLine.match(/^[A-Z][A-Z\s]+\s+\d+[,\.]\d{2}/)) {
                                 break;
                             }
-                            
-                            j++;
-                        }
-                        
-                        if (!foundQuantity) {
-                            console.log(`    → No quantity found, using default: 1`);
                         }
                         
                         const item = {
-                            name: productName.toUpperCase(),
+                            name: productName,
                             price: price,
                             quantity: quantity,
                             unitPrice: unitPrice,
@@ -1141,27 +1145,34 @@
                         };
                         
                         items.push(item);
-                        console.log(`  → ADDED ITEM:`, item);
-                    } else {
-                        console.log(`  → Product validation failed`);
+                        console.log(`  → ADDED:`, item);
                     }
-                } else if (line.match(/\d+[,\.]\d{2}/) && !line.match(/^\d/)) {
-                    console.log(`  → Line has price but didn't match pattern`);
+                } else if (line.match(/\d+[,\.]\d{2}/)) {
+                    console.log(`  → Has price but no match`);
                 }
             }
             
-            console.log(`\n=== PARSING COMPLETE ===`);
+            console.log(`\n=== SUMMARY ===`);
             console.log(`Found ${items.length} items`);
             
-            // Find total if not found yet
-            if ((!total || total < items.reduce((sum, item) => sum + item.price, 0)) && items.length > 0) {
-                const summeMatch = content.match(/SUMME\s+EUR\s+(\d+[,\.]\d{2})/);
+            // Find total if not already found
+            if (!total && items.length > 0) {
+                // Look for SUMME pattern in entire content
+                const summeMatch = content.match(/SUMME\s+(?:EUR\s+)?(\d+[,\.]\d{2})/);
                 if (summeMatch) {
                     total = parseFloat(summeMatch[1].replace(',', '.'));
-                    console.log('Found total from SUMME pattern:', total);
+                    console.log(`Found total from SUMME pattern: ${total}`);
                 } else {
-                    total = items.reduce((sum, item) => sum + item.price, 0);
-                    console.log('Calculated total from items:', total);
+                    // Look for Gesamtbetrag
+                    const gesamtMatch = content.match(/Gesamtbetrag[^\d]*(\d+[,\.]\d{2})/);
+                    if (gesamtMatch) {
+                        total = parseFloat(gesamtMatch[1].replace(',', '.'));
+                        console.log(`Found total from Gesamtbetrag: ${total}`);
+                    } else {
+                        // Calculate from items
+                        total = items.reduce((sum, item) => sum + item.price, 0);
+                        console.log(`Calculated total: ${total}`);
+                    }
                 }
             }
             
