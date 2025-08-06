@@ -983,24 +983,37 @@
             // Remove BOM if present
             content = content.replace(/^\ufeff/, '');
             
-            // Prepare content for better parsing
-            // Add line breaks before common markers
-            content = content.replace(/\s+(EUR)\s+/g, '\n$1\n');
-            content = content.replace(/\s+(SUMME)/g, '\n$1');
-            content = content.replace(/\s+(\-{5,})/g, '\n$1');
-            content = content.replace(/\s+(={5,})/g, '\n$1');
-            content = content.replace(/\s+(\*\s*\*)/g, '\n$1');
+            console.log('Original content length:', content.length);
+            console.log('First 200 chars:', content.substring(0, 200));
             
-            // Split long product lines - look for pattern: PRICE [A/B] PRODUCTNAME
-            content = content.replace(/(\d+[,\.]\d{2}\s*[AB]?)\s+([A-Z][A-Z\.\s]+?)(?=\s+\d+[,\.]\d{2}\s*[AB]?|$)/g, '$1\n$2');
-            
-            console.log('Preprocessed content preview:', content.substring(0, 500));
+            // Special handling for single-line format
+            // Look for pattern where everything is on one line
+            if (content.split('\n').length < 5) {
+                console.log('Detected single-line format, applying special processing...');
+                
+                // Add line breaks before key markers
+                content = content.replace(/\s+(EUR)\s+/g, '\n$1\n');
+                content = content.replace(/\s+(--+)/g, '\n$1\n');
+                content = content.replace(/\s+(==+)/g, '\n$1\n');
+                content = content.replace(/\s+(\*\s*\*)/g, '\n$1');
+                content = content.replace(/\s+(SUMME)/g, '\n$1');
+                
+                // Split products - look for pattern: PRODUCTNAME PRICE [A/B]
+                // This regex looks for uppercase product names followed by price and optional tax category
+                content = content.replace(/\s+([A-Z][A-Z\s\.\-]+?)\s+(\d+[,\.]\d{2}\s*[AB]?)/g, '\n$1 $2');
+                
+                console.log('After line break additions:', content.substring(0, 500));
+            }
             
             // Split content into lines
             let lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
             
             console.log(`Total lines after preprocessing: ${lines.length}`);
-            console.log('First 20 lines:', lines.slice(0, 20).map((l, i) => `${i}: ${l.substring(0, 60)}${l.length > 60 ? '...' : ''}`));
+            if (lines.length < 30) {
+                console.log('All lines:', lines.map((l, i) => `${i}: ${l}`));
+            } else {
+                console.log('First 30 lines:', lines.slice(0, 30).map((l, i) => `${i}: ${l}`));
+            }
             
             const items = [];
             let total = 0;
@@ -1034,7 +1047,7 @@
                      line.includes('SUMME') ||
                      line.includes('* *') ||
                      line.includes('Kundenbeleg'))) {
-                    console.log(`Product section ends at line ${i}: "${line.substring(0, 40)}..."`);
+                    console.log(`Product section ends at line ${i}: "${line}"`);
                     
                     if (line.includes('SUMME')) {
                         const totalMatch = line.match(/SUMME\s+(?:EUR\s+)?(\d+[,\.]\d{2})/);
@@ -1048,12 +1061,14 @@
                 
                 if (!inProductSection) continue;
                 
-                console.log(`\nLine ${i}: "${line}"`);
+                console.log(`\nProcessing line ${i}: "${line}"`);
                 
                 // Skip non-product lines
                 if (line === 'EUR' ||
                     line.includes('Handeingabe') || 
                     line.includes('E-Bon') ||
+                    line.includes('Tel.:') ||
+                    line.includes('UID') ||
                     line.includes('=') ||
                     line.includes('%') ||
                     line.includes('Steuer') ||
@@ -1064,99 +1079,83 @@
                     continue;
                 }
                 
-                // Try different patterns to match products
-                let matched = false;
+                // Try to match product pattern: NAME PRICE [TAX]
+                const productMatch = line.match(/^(.+?)\s+(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
                 
-                // Pattern 1: PRODUCTNAME PRICE [TAX]
-                let productMatch = line.match(/^(.+?)\s+(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
-                
-                // Pattern 2: Just PRICE [TAX] (product name might be on previous line)
-                if (!productMatch && line.match(/^\d+[,\.]\d{2}\s*[AB]?$/)) {
-                    // Check if previous line is a product name
-                    if (i > 0 && lines[i-1].match(/^[A-Z][A-Z\.\s\-]+$/)) {
-                        const productName = lines[i-1];
-                        productMatch = line.match(/^(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
-                        if (productMatch) {
-                            console.log(`  → Found split product: "${productName}" with price on next line`);
-                            matched = [null, productName, productMatch[1], productMatch[2]];
-                        }
-                    }
-                } else {
-                    matched = productMatch;
-                }
-                
-                if (matched) {
-                    const productName = matched[1].trim();
-                    const price = parseFloat(matched[2].replace(',', '.'));
-                    const taxCategory = matched[3] || 'B';
+                if (productMatch) {
+                    const productName = productMatch[1].trim();
+                    const price = parseFloat(productMatch[2].replace(',', '.'));
+                    const taxCategory = productMatch[3] || 'B';
                     
                     console.log(`  → MATCHED: "${productName}" - ${price}€ [${taxCategory}]`);
                     
                     // Validate product
                     if (price > 0 && price < 1000 && productName.length > 1 &&
                         !productName.match(/^\d/) && // Don't start with number
-                        !productName.includes('=')) {
-                        
-                        let quantity = 1;
-                        let unitPrice = price;
-                        
-                        // Look for quantity in next lines
-                        for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-                            const nextLine = lines[j];
-                            
-                            // Skip non-quantity lines
-                            if (nextLine.includes('Handeingabe') || nextLine.includes('E-Bon')) {
-                                continue;
-                            }
-                            
-                            // Weight pattern
-                            const weightMatch = nextLine.match(/^(\d+[,\.]\d+)\s*(kg|g|l|ml)(?:\s*x\s*(\d+[,\.]\d+))?/i);
-                            if (weightMatch) {
-                                quantity = parseFloat(weightMatch[1].replace(',', '.'));
-                                if (weightMatch[3]) {
-                                    unitPrice = parseFloat(weightMatch[3].replace(',', '.'));
-                                }
-                                console.log(`    → Quantity: ${quantity} ${weightMatch[2]}`);
-                                i = j;
-                                break;
-                            }
-                            
-                            // Piece pattern
-                            const pieceMatch = nextLine.match(/^(\d+)\s*(?:Stk|stk|STK)?\s*x\s*(\d+[,\.]\d+)$/);
-                            if (pieceMatch) {
-                                quantity = parseInt(pieceMatch[1]);
-                                unitPrice = parseFloat(pieceMatch[2].replace(',', '.'));
-                                console.log(`    → Pieces: ${quantity} x ${unitPrice}€`);
-                                i = j;
-                                break;
-                            }
-                            
-                            // Stop if next line is a product
-                            if (nextLine.match(/^[A-Z].*\s+\d+[,\.]\d{2}/) || 
-                                nextLine.includes('---') ||
-                                nextLine.match(/^\d+[,\.]\d{2}\s*[AB]?$/)) {
-                                break;
-                            }
-                        }
+                        !productName.includes('=') &&
+                        !productName.includes('EUR')) {
                         
                         const item = {
                             name: productName.toUpperCase(),
                             price: price,
-                            quantity: quantity,
-                            unitPrice: unitPrice,
+                            quantity: 1,
+                            unitPrice: price,
                             category: categorizeProduct(productName)
                         };
                         
                         items.push(item);
                         console.log(`  → ADDED:`, item);
                     } else {
-                        console.log(`  → Invalid product`);
+                        console.log(`  → Invalid product (validation failed)`);
                     }
+                } else {
+                    console.log(`  → No match for product pattern`);
                 }
             }
             
             console.log(`\n=== SUMMARY ===`);
             console.log(`Found ${items.length} items`);
+            
+            // If no items found, try alternative parsing for single-line format
+            if (items.length === 0 && lines.length > 0) {
+                console.log('\nTrying alternative parsing for first line...');
+                const firstLine = lines[0];
+                
+                // Look for EUR marker and split from there
+                const eurIndex = firstLine.indexOf(' EUR ');
+                if (eurIndex > 0) {
+                    const productsPart = firstLine.substring(eurIndex + 5);
+                    console.log('Products part:', productsPart.substring(0, 100) + '...');
+                    
+                    // Use regex to find all products in the string
+                    const productRegex = /([A-Z][A-Z\s\.\-]+?)\s+(\d+[,\.]\d{2})\s*([AB])?/g;
+                    let match;
+                    
+                    while ((match = productRegex.exec(productsPart)) !== null) {
+                        const productName = match[1].trim();
+                        const price = parseFloat(match[2].replace(',', '.'));
+                        const taxCategory = match[3] || 'B';
+                        
+                        // Stop at SUMME or separator
+                        if (productName.includes('----') || productName.includes('SUMME')) {
+                            break;
+                        }
+                        
+                        if (price > 0 && price < 1000 && productName.length > 1) {
+                            const item = {
+                                name: productName.toUpperCase(),
+                                price: price,
+                                quantity: 1,
+                                unitPrice: price,
+                                category: categorizeProduct(productName)
+                            };
+                            
+                            items.push(item);
+                            console.log(`Alternative parse found: ${productName} - ${price}€`);
+                        }
+                    }
+                }
+            }
             
             // Find total if not already found
             if (!total && items.length > 0) {
