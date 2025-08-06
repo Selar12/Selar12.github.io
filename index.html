@@ -1329,6 +1329,43 @@
             }
         }
 
+        function processProducts() {
+            allProducts = [];
+            const productMap = {};
+
+            allReceipts.forEach(receipt => {
+                receipt.items.forEach(item => {
+                    if (!productMap[item.name]) {
+                        productMap[item.name] = {
+                            name: item.name,
+                            category: item.category || categorizeProduct(item.name),
+                            purchases: [],
+                            totalQuantity: 0,
+                            totalSpent: 0
+                        };
+                    }
+                    
+                    productMap[item.name].purchases.push({
+                        date: receipt.date,
+                        price: item.price,
+                        quantity: item.quantity || 1,
+                        unitPrice: (item.quantity || 1) > 0 ? item.price / (item.quantity || 1) : item.price
+                    });
+                    
+                    productMap[item.name].totalQuantity += (item.quantity || 1);
+                    productMap[item.name].totalSpent += item.price;
+                });
+            });
+
+            allProducts = Object.values(productMap);
+            
+            allProducts.forEach(product => {
+                productCategories[product.name] = product.category;
+            });
+            
+            updateCategoryFilter();
+        }
+
         async function listAllFiles() {
             console.log('Listing files from folder:', FOLDER_ID);
             const files = [];
@@ -1376,6 +1413,35 @@
                 console.error('Error processing e-bon:', error);
                 return null;
             }
+        }
+
+        function loadStoredData() {
+            const storedData = localStorage.getItem('reweEbonData');
+            if (storedData) {
+                const data = JSON.parse(storedData);
+                allReceipts = data.receipts || [];
+                allProducts = data.products || [];
+                productCategories = data.categories || {};
+                
+                if (data.lastSync) {
+                    document.getElementById('lastSync').textContent = new Date(data.lastSync).toLocaleString('de-DE');
+                }
+                
+                if (allReceipts.length > 0) {
+                    updateView();
+                }
+            }
+        }
+
+        function saveData() {
+            const data = {
+                receipts: allReceipts,
+                products: allProducts,
+                categories: productCategories,
+                lastSync: Date.now()
+            };
+            localStorage.setItem('reweEbonData', JSON.stringify(data));
+            localStorage.setItem('processedFiles', JSON.stringify(Array.from(processedFiles)));
         }
 
         function processProducts() {
