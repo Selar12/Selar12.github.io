@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REWE E-Bon Analyzer</title>
+    <title>REWE E-Bon Analyzer - Enhanced Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <!-- Google API Client Library -->
@@ -36,6 +36,17 @@
             color: #333;
             margin-bottom: 30px;
             font-size: 2.5rem;
+        }
+
+        .version-badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-left: 20px;
+            font-weight: 600;
         }
 
         .setup-section {
@@ -348,6 +359,15 @@
             display: none;
         }
 
+        .update-info {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+        }
+
         @media (max-width: 768px) {
             .charts-grid {
                 grid-template-columns: 1fr;
@@ -366,7 +386,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>🛒 REWE E-Bon Analyzer</h1>
+        <h1>
+            🛒 REWE E-Bon Analyzer
+            <span class="version-badge">April 2025 Update</span>
+        </h1>
+
+        <div class="update-info">
+            <strong>🆕 Neue Features:</strong> Erweiterte Kategorisierung mit 80+ neuen Produkten aus April 2025, 
+            verbesserte Parser-Logik für verschiedene E-Bon Formate, optimierte Produkterkennung.
+        </div>
         
         <!-- Setup Instructions -->
         <div class="setup-section" id="setupSection">
@@ -398,7 +426,7 @@
                         <li>Gehen Sie zu "APIs & Services" → "Anmeldedaten"</li>
                         <li>Klicken Sie auf "+ ANMELDEDATEN ERSTELLEN" → "OAuth-Client-ID"</li>
                         <li>Wählen Sie "Webanwendung" als Anwendungstyp</li>
-                        <li>Fügen Sie bei "Autorisierte JavaScript-Quellen" Ihre Domain hinzu (z.B. <code>http://localhost</code> für lokale Tests)</li>
+                        <li>Fügen Sie bei "Autorisierte JavaScript-Quellen" Ihre Domain hinzu</li>
                         <li>Kopieren Sie die Client-ID</li>
                     </ol>
                 </div>
@@ -557,10 +585,10 @@
     </div>
 
     <script>
-        // Configuration
+        // ===== CONFIGURATION =====
         const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
         const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
-        const FOLDER_ID = '1y0t0pS3gvlaB4MzrsmRJxuFvwOGEhtfB'; // Your folder ID
+        const FOLDER_ID = '1y0t0pS3gvlaB4MzrsmRJxuFvwOGEhtfB';
 
         // Global variables
         let tokenClient;
@@ -575,250 +603,509 @@
         let charts = {};
         let processedFiles = new Set(JSON.parse(localStorage.getItem('processedFiles') || '[]'));
 
-        // Verbesserte Kategorisierung für REWE E-Bon Analyzer
-const improvedCategoryMapping = {
-    'Obst & Gemüse': [
-        // Obst
-        'BANANE', 'APFEL', 'KIWI', 'ORANGE', 'MANDARINE', 'HEIDELBEER', 'HIMBEERE',
-        'MANGO', 'ERDBEERE', 'KIRSCHEN', 'NEKTARINE', 'PFIRSICH', 'TRAUBE', 'MELONE',
-        'ANANAS', 'APRIKOSE', 'BIRNE', 'PFLAUME', 'WEINTRAUBE', 'BLAUBEERE', 'ZITRONE',
-        'WASSERMELONE', 'CANTALOUPE', 'HONIGMELONE', 'GRAPEFRUIT', 'LIMETTE', 'BEEREN',
-        'ZWETSCHGE', 'TROPISCHE MISCH', 'TROPISCHE FRUCHT', 'GARTEN ERDBEEREN',
-        'EXTRA ERDBEERE', 'EXTRA HIMBEERE', 'EXTRA HEIDELBEER', 'EXTRA 3 BEEREN',
-        
-        // Gemüse
-        'TOMATE', 'CHERRYROMATOMATE', 'SALATGURKE', 'GURKE', 'PAPRIKA', 'KARTOFFEL',
-        'KAROTTE', 'ZWIEBEL', 'AVOCADO', 'INGWER', 'KNOBLAUCH', 'PORREE', 'LAUCH',
-        'CHAMPIGNON', 'AUBERGINE', 'ZUCCHINI', 'BROKKOLI', 'BROCCOLI', 'KOHLRABI',
-        'KUERBIS', 'KOPFSALAT', 'FELDSALAT', 'EISBERGSALAT', 'SALAT', 'SPINAT',
-        'RUCOLA', 'RADIESCHEN', 'LAUCHZWIEBEL', 'BABYSPINAT', 'SALAT BUNT',
-        'MINIRISPE', 'SALAT KOPF',
-        
-        // Konserven/Verarbeitetes Gemüse (aber noch Gemüse)
-        'STUECKIGE TOMATE', 'PASSIERTE TOMATE', 'SCHAELTOMATEN', 'TOMATENMARK',
-        'POLPA FINE', 'GEH. TOMATEN', 'TOMATEN PASSIERT', 'TOMATEN STUECKIG',
-        'SAUERKIRSCHEN', 'APFELMUS', 'APFELMARK', 'GURKENHAPPEN', 'SAUERKRAUT',
-        'CORNICHONS', 'SCHLES.GURKENHAP', 'SCH.GURKENHAPPEN'
-    ],
-    
-    'Fleisch & Wurst': [
-        'FLEISCHWURST', 'WIENER', 'HACKFLEISCH', 'PUTENBRUST', 'BRATWURST',
-        'HAEHNCHEN', 'HAEHNCHENSCH', 'SCHINKEN', 'SALAMI', 'METTWURST', 'BOCKWURST',
-        'BACON', 'MINUTENSTEAK', 'RIND', 'SCHWEIN', 'GEFLÜGEL', 'CHICKEN',
-        'STEAK', 'GULASCH', 'LEBERWURST', 'LYONER', 'ROSTBRATWURST', 'SCHINKENWURST',
-        'TEEWURST', 'CERVELATWURST', 'MORTADELLA', 'ENTRECOTE', 'FILET',
-        'KOTELETT', 'LAMMFLEISCH', 'WILDFLEISCH', 'KASSELER', 'SPECK',
-        'KRAKAUER', 'FRIKADELLE', 'ROSTBRATW', 'RUECKENSTEAK', 'GRILLIES',
-        'CHICKEN NUGGETS', 'CHICKEN DRUMS', 'CHICKEN WINGS', 'HA-HAEHN'
-    ],
-    
-    'Milchprodukte': [
-        // Milch & Sahne
-        'BERGBAUERNMI', 'MILCH', 'WEIDEMILCH', 'SAHNE', 'SCHLAGSAHNE', 'CREME FRAICHE',
-        'SCHMAND', 'SAHNSTEIFE', 'SAHNESTEIFE',
-        
-        // Joghurt & Quark
-        'JOGHURT', 'KINDERJOG', 'KINDERJOGHURT', 'FRUCHTJOGHURT', 'FRUCHTQUARK',
-        'QUARK', 'DICKMILCH', 'KEFIR', 'KALINKA KEFIR', 'BUTTERMILCH',
-        'JOGURT', 'NATURJOGHURT', 'FRUCHTJO', 'GOETTERSP', 'MUELLERMILCH',
-        'MONTE', 'ZOTT MONTE', 'SAHNEPUDDING', 'PUDDING',
-        
-        // Käse
-        'KAESE', 'GOUDA', 'EMMENTALER', 'MOZZARELLA', 'FETA', 'CAMEMBERT',
-        'FRISCHKAESE', 'PHILADELPHIA', 'ALMETTE', 'GERAMONT', 'BEEMSTER',
-        'CAMPINA', 'WESTLITE', 'GRAEDDOST', 'PARMESAN', 'RICOTTA', 'MASCARPONE',
-        'BRESSO', 'EXQUISA', 'BUKO', 'MIREE', 'SALAKIS', 'PATROS', 'REIBEKAESE',
-        'GERIEBEN',
-        
-        // Butter & Streichfette
-        'BUTTER', 'MARKENBUTTER', 'WEIDEBUTTER', 'STREICHFETT', 'IRISCHE BUTTER',
-        'RAMA', 'DELI REFORM'
-    ],
-    
-    'Backwaren': [
-        'BROT', 'BROETCHEN', 'TOAST', 'BAGUETTE', 'LAUGENB', 'SONNTAGSBROETCH',
-        'DINKEL-BROETCHEN', 'DINKELMEHL', 'MEHL', 'WEIZENMEHL', 'ROGGENMEHL',
-        'VOLLKORNBROT', 'PUMPERNICKEL', 'CIABATTA', 'CROISSANT', 'HEFE',
-        'BACKPULVER', 'VANILLEZUCKER', 'VANILLINZUCKER', 'BACKIN', 'KNAECKE',
-        'ZWIEBACK', 'KNUSPERBROT', 'DINKEL SANDWICH', 'DINKEL 630',
-        'KOERNER BALANCE', 'ROGGEN BROETCH'
-    ],
-    
-    'Getränke': [
-        // Wasser & Säfte
-        'COCA COLA', 'COLA', 'SCHLOSSQU', 'VITAMIN SAFT', 'APFELSAFT', 'ORANGENSAFT',
-        'SAFT', 'WASSER', 'LEMONAID', 'MINERALWASSER', 'SPRUDEL', 'HEILWASSER',
-        'TRAUBENSAFT', 'KIRSCHSAFT', 'ANANASSAFT', 'MULTI', 'ROTER MULTI',
-        'APFELSINENSAFT', 'ORANGE SAFT', 'HOHES C',
-        
-        // Kaffee & Tee
-        'KAFFEE', 'CAFFEE', 'CAFFE CREMA', 'DALLMAYR', 'EDUSCHO', 'PRODOMO',
-        'NESCAFE', 'QUALITA ROSSA', 'TEE', 'MATCHA', 'KAMILLE', 'KAMILLEN TEE',
-        'SALBEI', 'YOGI', 'KRAEUTER ORIG',
-        
-        // Kakao & Milchgetränke
-        'KAKAO', 'CHOCOMEL', 'NESQUIK', 'KAKAOGETRAENK',
-        
-        // Bier & Alkoholfreies
-        'BIER', 'VELTINS', 'FIEGE', 'LANDPARK', 'KROM', 'GREVENSTEINER',
-        'FASSBRAU', 'ENERGY', 'EISTEE', 'SMOOTHIE', 'LIMONADE'
-    ],
-    
-    'Süßwaren & Snacks': [
-        // Schokolade
-        'SCHOKOLADE', 'SCHOKO', 'DUPLO', 'KITKAT', 'LION', 'KINDER',
-        'TOFFIFEE', 'SCHOKOBONS', 'ALPENMILCH', 'VOLLMILCH', 'HASELNUSS',
-        'NUSS-NOUGAT', 'BION.NUSS-NOUGAT', 'KNUSPER NUSS', 'VOLL-NUSS',
-        'EDEL-VOLLMILCH', 'RASPELSCHOKOLADE', 'GLASUR KAKAO', 'MARS', 'TWIX',
-        'CELEBRATIONS', 'RIEGEL', 'HANUTA', 'MONTE SCHOKO', 'CHOCOLAT',
-        
-        // Gummibärchen & Bonbons
-        'HARIBO', 'GUMMIBAERCHEN', 'LAKRITZ', 'BONBON', 'LUTSCHER',
-        'MARSHMALLOW', 'PASTA FRU', 'STARMIX', 'RAINBOW', 'HAPPY COL',
-        'TROPI FRU', 'GOLDBAER', 'YOGHURT GUMS', 'EUKAL', 'LOLLIES',
-        
-        // Kekse & Gebäck
-        'PRINZENROLLE', 'KEKS', 'WAFFEL', 'BROWNIE', 'FRISCHEIWAFFEL',
-        'MINI MAGDALENAS', 'ERDBEERSTREIFEN',
-        
-        // Chips & Salziges
-        'CHIPS', 'CRUNCHIPS', 'PRINGLES', 'SALTLETTS', 'SALZSTANGEN',
-        'POPCORN', 'OFEN CHIPS', 'KESSELCHIPS', 'CHIPSFR', 'RIFFELS',
-        'LAYS', 'SNACK HITS', 'TUC', 'ERDNUESSE', 'OFEN ERDNUESSE'
-    ],
-    
-    'Grundnahrungsmittel': [
-        // Nudeln & Reis
-        'NUDELN', 'REIS', 'FUSILLI', 'SPAGHETTI', 'PENNE', 'SPIRALEN',
-        'LASAGNE', 'BASMATI', 'PASTA', 'FARFALLE', 'ELICHE', 'KORKENZIEHERNUD',
-        'MACCHERONI', 'SPAETZLE', 'COLLEZ.FARFALLE', 'DINKEL SPAGH',
-        'BUCHSTABEN', 'KLEBEREIS', 'HIMALAYA BASMATI', 'HIMALYA BASMATI',
-        
-        // Getreide & Hülsenfrüchte
-        'LINSEN', 'BULGUR', 'COUSCOUS', 'QUINOA', 'HAFERFLOCKEN', 'MUESLI',
-        'ROTE LINSEN', 'KICHERERBSEN', 'BOHNEN', 'ERBSEN', 'URKORN MUESLI',
-        'FLOHSAMEN', 'CHIA SAMEN', 'LEINSAMEN',
-        
-        // Öl & Essig
-        'OEL', 'OLIVENOEL', 'SONNENBLUMENOEL', 'RAPSOEL', 'ESSIG', 'REISESSIG',
-        'KOKOSFETT', 'KOKOSM.FETTRED',
-        
-        // Zucker & Salz
-        'ZUCKER', 'SALZ', 'JODSALZ', 'ALPENJODSALZ', 'WUERFELZUCKER', 'PUDERZUCKER',
-        'FEINSTER ZUCKER',
-        
-        // Honig & Aufstriche
-        'HONIG', 'MARMELADE', 'NUTELLA', 'KONFITUE', 'KONF.', 'BROTAUFSTRICH',
-        'IMKER HONIG', 'BLUETENHONIG', 'GEBIRGSBL.HONIG', 'SALBEI-HONIG'
-    ],
-    
-    'Gewürze & Saucen': [
-        // Gewürze
-        'GEWUERZE', 'PFEFFER', 'CURRY', 'PAPRIKA', 'CHILI', 'BASILIKUM',
-        'ROSMARIN', 'KRAEUTER', 'ZWIEBEL-KRAEUTER', 'GARTENKR', 'CURRY PULVER',
-        'CHILIPULVER', 'PFEFFER SCHWARZ', 'SWEET PAPRIKA', 'SESAM',
-        
-        // Saucen & Dressings
-        'KETCHUP', 'MAYONNAISE', 'SENF', 'BBQ SAUCE', 'REMOULADE', 'MIRACEL WHIP',
-        'SALAT MAYONNAISE', 'KNOBLAUCHSAUCE', 'SCHASCHLIKSAUCE', 'COCKTAILSAUCE',
-        'TOMATENKETCHUP', 'TOMATO KETCHUP', 'KNOBL. SAUCE', 'SAUCE ZU BRATEN',
-        
-        // Brühen & Würzmittel
-        'BOUILLON', 'BRUEHE', 'MAGGI', 'DELI. BRUEHE', 'GEMUESE BOUILLON',
-        'HUEHNERSUPPE', 'CLASSIC WUERFEL', 'SK BLOCK KRAEUT'
-    ],
-    
-    'Fertiggerichte & Konserven': [
-        'PIZZA', 'FISCHSTAEBCHEN', 'CHICKEN NUGGETS', 'SCHUPFNUDELN',
-        'RAVIOLI', 'GOLDMAIS', 'ERBSEN', 'MAIS', 'ZUCKERMAIS', 'ERBSEN MOEHRCHEN',
-        'ERBSEN M.KAROTT', 'TOMATEN DOSE', 'SCHAELTOMATEN', 'PASSIERTE TOMATE',
-        'STUECKIGE TOMATE', 'SAUERKRAUT', 'GURKEN', 'BOHNEN', 'LINSEN DOSE',
-        'KICHERERBSEN', 'CHAMPIGNONS DOSE', 'THUNFISCH', 'SARDINEN', 'HERINGSFILET',
-        'ANANAS DOSE', 'ANANASSCHEIBEN', 'ANANAS CHUNKS', 'NUDELN IN TOMAT',
-        'MIN HUHN NU', 'GEMUESE RAVIOLI', 'GNOCCHI', 'REIBEKUCHENTEIG'
-    ],
-    
-    'Fisch & Meeresfrüchte': [
-        'LACHS', 'FORELLE', 'THUNFISCH', 'GARNELE', 'KRABBEN', 'MUSCHELN',
-        'TINTENFISCH', 'KABELJAU', 'SEELACHS', 'HERING', 'MAKRELE', 'SARDINE',
-        'FISCHFILET', 'RAEUCHERLACHS', 'MATJES', 'ROLLMOPS', 'BISMARCKHERING',
-        'LIEBLINGS LACHS', 'MEIN LIEB. LACHS', 'RAEUCHER-LACHS', 'RAEUCHERL',
-        'BIO RAEUCHERLACH', 'AUSLESE CLASSIC'
-    ],
-    
-    'Haushalt & Hygiene': [
-        // Hygieneartikel
-        'ALWAYS', 'SENSODYNE', 'ZAHNPASTA', 'SHAMPOO', 'DUSCHE', 'SEIFE',
-        'DEO', 'RASIERER', 'GILLETTE', 'PFLEGEDUSCHE', 'MUNDWASSER', 'MUNDSPUELUNG',
-        'ZAHNSEIDE', 'HANDCREME', 'BODYLOTION', 'GESICHTSCREME', 'WATTESTAEBCHEN',
-        'FEUCHTTUCH', 'MEN EXPERT', 'KNEIPP', 'SCHAUMBAD', 'TRAUMBAD',
-        'KINDERZAHNP', 'KINDERZAHNB', 'KINDER SHAMPOO', 'L OREAL',
-        
-        // Babyartikel
-        'PENATEN', 'PAMPERS', 'WINDELN', 'BUEB.BABY', 'BP PANTS', 'SP PANTS',
-        'FEUCHTTUCH SENS',
-        
-        // Putzmittel
-        'TOILETTENPAP', 'KUECHENTUECHER', 'MUELLBTL', 'REINIGER', 'SPUELMITTEL',
-        'WASCHMITTEL', 'SCHWAMM', 'PRIL', 'HYGIENE REINIGER', 'WC REIN',
-        'SAGROTAN', 'MR.PROPER', 'DOM. WCS', 'TOPFREINIGER', 'ENTKALKER',
-        'REINIGER PASTE', 'MASCHINENT. REIN', 'FENSTERTUCH', 'JEANS-BL TUECHER',
-        'LUXUS TOILET.PAP', 'ZEWA'
-    ],
-    
-    'Tiefkühl': [
-        'TK-', 'TIEFKUEHL', 'EISBERGSALAT TK', 'SPINAT TK', 'ERBSEN TK',
-        'POMMES', 'KROKETTEN', 'FISCHFILET TK', 'GARNELEN TK', 'BEEREN TK',
-        'GEMUESE TK', 'KRAEUTERMIX TK', 'FERTIGGERICHT TK', 'EIS', 'SPEISEEIS',
-        'TK BEERENMISCH', 'FREIBAD POMMMES', 'SUESSK. POMMES'
-    ],
-    
-    'Babynahrung': [
-        'KAROT.KART.RIND', 'FR.KAROTT+KARTOF', 'BABYGLAS', 'HIPP', 'ALETE',
-        'BEBIVITA', 'BABYBREI', 'FOLGEMILCH', 'ANFANGSMILCH', 'BABYKEKS',
-        'BAN.APF.ERD.H', 'BAN.,ERDB.,QUIN.', 'RG BIRNE PFL.BR.'
-    ],
-    
-    'Pfand': [
-        'PFAND', 'LEERG', 'EINWEG', 'MEHRWEG'
-    ],
-    
-    'Asiatische Produkte': [
-        'NORI', 'GOMA', 'SUSHI', 'MAKI', 'FUTO', 'CAL.', 'WASABI', 'SOJA',
-        'ASIA.', 'ASIATISCH'
-    ],
-    
-    'Non-Food': [
-        // Spielwaren
-        'PISTENRAUPE', 'BETONMISCHER', 'SCHORNSTEINFEGER', 'DICKER BRUMMER',
-        'ZOO', 'TRAUMBAD', 'GARTENZWERGE',
-        
-        // Bürobedarf
-        'FRIXION', 'FASERMALER', 'STIFT', 'KERZE',
-        
-        // Haushaltswaren
-        'DOSENOEFFNER', 'GR. PAPIERTASCHE', 'KL.PAPIERTASCHE', 'PERMA-TASCHE',
-        'PARTYKERZEN', 'TOUCH&FRESH', 'GLADE',
-        
-        // Diverses
-        'W.RIESE COLOR', 'COLOR PULVER', 'UNIVERSAL PULVER', 'ROLLER EXTREME',
-        'ZAUBERFLEKS', 'MINI CLASSIC', 'FITNESSMISCHUNG', 'AKUT GEL',
-        'SONNENSPRAY KIDS', 'MATT-PASTE', 'AIRWAVES', 'EXTRA PROF',
-        'EASYLIFE', 'NATUREL.MINI', 'MOUSSE', 'GRAND DESS', 'FRUCHT FLIP',
-        'STRACCIATELLA', 'TRULLI', 'BION.', 'SCHLEFI', 'GREVENSTEINER',
-        'MINIS PUR', 'BECHERGL', 'NATURALS', 'MIWA PURE', 'GRILLMAISBBQ',
-        'FITNESS MISCHUNG', 'BUNTER MIX', 'TOTAL CARE', 'SH FOR MEN',
-        'SH&D SPORTSFREU', 'KRAFT-GEL', 'WC-STEIN', 'SPUELMASCH.PFL.',
-        'GSM CLASSIC', 'NB GR.1 NEWB', 'SP NB GR.1 NEWB', 'ALL IN 1 EXTRA',
-        'WC AKTIVGEL', 'N2 GARTENZWERGE', 'SCHMIRGEL', '2IN1 DUSCHE',
-        'ERF.GETR.MATE', 'NUSS-MIX DOSE'
-    ],
-    
-    'Sonstiges': []  // Nur für wirklich nicht kategorisierbare Artikel
-};
+        // ===== ERWEITERTE KATEGORISIERUNG (April 2025 Update) =====
+        const categoryMapping = {
+            'Obst & Gemüse': [
+                // Obst
+                'BANANE', 'APFEL', 'KIWI', 'ORANGE', 'MANDARINE', 'HEIDELBEER', 'HIMBEERE',
+                'MANGO', 'ERDBEERE', 'KIRSCHEN', 'NEKTARINE', 'PFIRSICH', 'TRAUBE', 'MELONE',
+                'ANANAS', 'APRIKOSE', 'BIRNE', 'PFLAUME', 'WEINTRAUBE', 'BLAUBEERE', 'ZITRONE',
+                'WASSERMELONE', 'CANTALOUPE', 'HONIGMELONE', 'GRAPEFRUIT', 'LIMETTE', 'BEEREN',
+                'ZWETSCHGE', 'TROPISCHE MISCH', 'TROPISCHE FRUCHT', 'GARTEN ERDBEEREN',
+                'EXTRA ERDBEERE', 'EXTRA HIMBEERE', 'EXTRA HEIDELBEER', 'EXTRA 3 BEEREN',
+                // April Ergänzungen
+                'BANANE CHIQUITA', 'APFEL BRAEBURN', 'MELONE HONIG', 'ORANGE 1KG SL',
+                'TRAUBE KERNL.HEL', 'OBST/GEMUESE',
+                
+                // Gemüse
+                'TOMATE', 'CHERRYROMATOMATE', 'SALATGURKE', 'GURKE', 'PAPRIKA', 'KARTOFFEL',
+                'KAROTTE', 'ZWIEBEL', 'AVOCADO', 'INGWER', 'KNOBLAUCH', 'PORREE', 'LAUCH',
+                'CHAMPIGNON', 'AUBERGINE', 'ZUCCHINI', 'BROKKOLI', 'BROCCOLI', 'KOHLRABI',
+                'KUERBIS', 'KOPFSALAT', 'FELDSALAT', 'EISBERGSALAT', 'SALAT', 'SPINAT',
+                'RUCOLA', 'RADIESCHEN', 'LAUCHZWIEBEL', 'BABYSPINAT', 'SALAT BUNT',
+                'MINIRISPE', 'SALAT KOPF', 'KAROTT', 'KARTOF', 'FR.KAROTT',
+                // April Ergänzungen
+                'INGWER BIO', 'KAROTTE REGIONAL', 'PAPRIKA ROT', 'SALAT BUNT GRUEN',
+                'SONNENBLUMMENK.',
+                
+                // Konserven/Verarbeitetes Gemüse
+                'STUECKIGE TOMATE', 'PASSIERTE TOMATE', 'SCHAELTOMATEN', 'TOMATENMARK',
+                'POLPA FINE', 'GEH. TOMATEN', 'TOMATEN PASSIERT', 'TOMATEN STUECKIG',
+                'SAUERKIRSCHEN', 'APFELMUS', 'APFELMARK', 'GURKENHAPPEN', 'SAUERKRAUT',
+                'CORNICHONS', 'SCHLES.GURKENHAP', 'SCH.GURKENHAPPEN',
+                // April Ergänzungen
+                'BIO GEH. TOMATEN', 'TOMATENM.BASILI.'
+            ],
+            
+            'Fleisch & Wurst': [
+                'FLEISCHWURST', 'WIENER', 'HACKFLEISCH', 'PUTENBRUST', 'BRATWURST',
+                'HAEHNCHEN', 'HAEHNCHENSCH', 'SCHINKEN', 'SALAMI', 'METTWURST', 'BOCKWURST',
+                'BACON', 'MINUTENSTEAK', 'RIND', 'SCHWEIN', 'GEFLÜGEL', 'CHICKEN',
+                'STEAK', 'GULASCH', 'LEBERWURST', 'LYONER', 'ROSTBRATWURST', 'SCHINKENWURST',
+                'TEEWURST', 'CERVELATWURST', 'MORTADELLA', 'ENTRECOTE', 'FILET',
+                'KOTELETT', 'LAMMFLEISCH', 'WILDFLEISCH', 'KASSELER', 'SPECK',
+                'KRAKAUER', 'FRIKADELLE', 'ROSTBRATW', 'RUECKENSTEAK', 'GRILLIES',
+                'CHICKEN NUGGETS', 'CHICKEN DRUMS', 'CHICKEN WINGS', 'HA-HAEHN',
+                // April Ergänzungen
+                'WIENER WUERSTCHE', 'SCHINKENFL. KNOB', 'GEFL.LYONER', 'GEFLUEGEL SALAMI',
+                'RD GULASCH KEULE', 'HAEHNCHEN SALAMI', 'HAEHN. SCHENKEL'
+            ],
+            
+            'Milchprodukte': [
+                // Milch & Sahne
+                'BERGBAUERNMI', 'MILCH', 'WEIDEMILCH', 'SAHNE', 'SCHLAGSAHNE', 'CREME FRAICHE',
+                'SCHMAND', 'SAHNSTEIFE', 'SAHNESTEIFE',
+                // April Ergänzungen
+                'BERGBAUERNMI 3,5', 'BERGBAUERNM.1,5%', 'BIO WEIDEMILCH', 'CR.FRAICHE NATUR',
+                'SCHLAGSAHNE 33%',
+                
+                // Joghurt & Quark
+                'JOGHURT', 'KINDERJOG', 'KINDERJOGHURT', 'FRUCHTJOGHURT', 'FRUCHTQUARK',
+                'QUARK', 'DICKMILCH', 'KEFIR', 'KALINKA KEFIR', 'BUTTERMILCH',
+                'JOGURT', 'NATURJOGHURT', 'FRUCHTJO', 'GOETTERSP', 'MUELLERMILCH',
+                'MONTE', 'ZOTT MONTE', 'SAHNEPUDDING', 'PUDDING',
+                // April Ergänzungen
+                'KINDERJO.PFIR.BA', 'KINDERJOG.HIMBEE', 'KINDERJOG.ERDBEE', 'JOGH.NATURMILD',
+                'FRUCHTJO.APRT', 'FRUCHTJOGH.HIMB.', 'FRUCHTJOGH.HEID.', 'BIO JOGH ERD/HIM',
+                'BIO JOGH HEIDELB', 'BIO JOGH PFIR.PA', 'NATUR', 'KALINKA',
+                
+                // Käse
+                'KAESE', 'GOUDA', 'EMMENTALER', 'MOZZARELLA', 'FETA', 'CAMEMBERT',
+                'FRISCHKAESE', 'PHILADELPHIA', 'ALMETTE', 'GERAMONT', 'BEEMSTER',
+                'CAMPINA', 'WESTLITE', 'GRAEDDOST', 'PARMESAN', 'RICOTTA', 'MASCARPONE',
+                'BRESSO', 'EXQUISA', 'BUKO', 'MIREE', 'SALAKIS', 'PATROS', 'REIBEKAESE',
+                'GERIEBEN',
+                // April Ergänzungen
+                'GOUDA GERIEBEN', 'CAMPINA GOUDA JG', 'GRAEDDOST SCHNIT',
+                
+                // Butter & Streichfette
+                'BUTTER', 'MARKENBUTTER', 'WEIDEBUTTER', 'STREICHFETT', 'IRISCHE BUTTER',
+                'RAMA', 'DELI REFORM',
+                // April Ergänzungen
+                'MARKENBUTTER ALU'
+            ],
+            
+            'Backwaren': [
+                'BROT', 'BROETCHEN', 'TOAST', 'BAGUETTE', 'LAUGENB', 'SONNTAGSBROETCH',
+                'DINKEL-BROETCHEN', 'DINKELMEHL', 'MEHL', 'WEIZENMEHL', 'ROGGENMEHL',
+                'VOLLKORNBROT', 'PUMPERNICKEL', 'CIABATTA', 'CROISSANT', 'HEFE',
+                'BACKPULVER', 'VANILLEZUCKER', 'VANILLINZUCKER', 'BACKIN', 'KNAECKE',
+                'ZWIEBACK', 'KNUSPERBROT', 'DINKEL SANDWICH', 'DINKEL 630',
+                'KOERNER BALANCE', 'ROGGEN BROETCH',
+                // April Ergänzungen
+                'HEFE AUFSTELLER', 'BAGUETTE HAWAII', 'BAGUETTE BOLOGN.'
+            ],
+            
+            'Getränke': [
+                // Wasser & Säfte
+                'COCA COLA', 'COLA', 'SCHLOSSQU', 'VITAMIN SAFT', 'APFELSAFT', 'ORANGENSAFT',
+                'SAFT', 'WASSER', 'LEMONAID', 'MINERALWASSER', 'SPRUDEL', 'HEILWASSER',
+                'TRAUBENSAFT', 'KIRSCHSAFT', 'ANANASSAFT', 'MULTI', 'ROTER MULTI',
+                'APFELSINENSAFT', 'ORANGE SAFT', 'HOHES C',
+                // April Ergänzungen
+                'SCHLOSSQU. NATUR', 'HEILWASSER STILL', 'MULTIVITAM.SAFT', 'LANDPARK BIO NAT',
+                
+                // Kaffee & Tee
+                'KAFFEE', 'CAFFEE', 'CAFFE CREMA', 'DALLMAYR', 'EDUSCHO', 'PRODOMO',
+                'NESCAFE', 'QUALITA ROSSA', 'TEE', 'MATCHA', 'KAMILLE', 'KAMILLEN TEE',
+                'SALBEI', 'YOGI', 'KRAEUTER ORIG',
+                // April Ergänzungen
+                'BARISTA DJ', 'KAMILLE 20ER',
+                
+                // Kakao & Milchgetränke
+                'KAKAO', 'CHOCOMEL', 'NESQUIK', 'KAKAOGETRAENK',
+                
+                // Bier & Alkoholfreies
+                'BIER', 'VELTINS', 'FIEGE', 'LANDPARK', 'KROM', 'GREVENSTEINER',
+                'FASSBRAU', 'ENERGY', 'EISTEE', 'SMOOTHIE', 'LIMONADE'
+            ],
+            
+            'Süßwaren & Snacks': [
+                // Schokolade
+                'SCHOKOLADE', 'SCHOKO', 'DUPLO', 'KITKAT', 'LION', 'KINDER',
+                'TOFFIFEE', 'SCHOKOBONS', 'ALPENMILCH', 'VOLLMILCH', 'HASELNUSS',
+                'NUSS-NOUGAT', 'BION.NUSS-NOUGAT', 'KNUSPER NUSS', 'VOLL-NUSS',
+                'EDEL-VOLLMILCH', 'RASPELSCHOKOLADE', 'GLASUR KAKAO', 'MARS', 'TWIX',
+                'CELEBRATIONS', 'RIEGEL', 'HANUTA', 'MONTE SCHOKO', 'CHOCOLAT',
+                // April Ergänzungen
+                'KIND. SCHOKOBONS', 'TOFFIFEE 15ER',
+                
+                // Gummibärchen & Bonbons
+                'HARIBO', 'GUMMIBAERCHEN', 'LAKRITZ', 'BONBON', 'LUTSCHER',
+                'MARSHMALLOW', 'PASTA FRU', 'STARMIX', 'RAINBOW', 'HAPPY COL',
+                'TROPI FRU', 'GOLDBAER', 'YOGHURT GUMS', 'EUKAL', 'LOLLIES',
+                // April Ergänzungen
+                'PASTA FRUTTA',
+                
+                // Kekse & Gebäck
+                'PRINZENROLLE', 'KEKS', 'WAFFEL', 'BROWNIE', 'FRISCHEIWAFFEL',
+                'MINI MAGDALENAS', 'ERDBEERSTREIFEN',
+                
+                // Chips & Salziges
+                'CHIPS', 'CRUNCHIPS', 'PRINGLES', 'SALTLETTS', 'SALZSTANGEN',
+                'POPCORN', 'OFEN CHIPS', 'KESSELCHIPS', 'CHIPSFR', 'RIFFELS',
+                'LAYS', 'SNACK HITS', 'TUC', 'ERDNUESSE', 'OFEN ERDNUESSE', 'NUSS',
+                // April Ergänzungen
+                'RIFFELS NATURELL'
+            ],
+            
+            'Grundnahrungsmittel': [
+                // Nudeln & Reis
+                'NUDELN', 'REIS', 'FUSILLI', 'SPAGHETTI', 'PENNE', 'SPIRALEN',
+                'LASAGNE', 'BASMATI', 'PASTA', 'FARFALLE', 'ELICHE', 'KORKENZIEHERNUD',
+                'MACCHERONI', 'SPAETZLE', 'COLLEZ.FARFALLE', 'DINKEL SPAGH',
+                'BUCHSTABEN', 'KLEBEREIS', 'HIMALAYA BASMATI', 'HIMALYA BASMATI',
+                // April Ergänzungen
+                'GEN.PUR SPAETZLE', 'LASAGNE GELB',
+                
+                // Eier
+                'EIER', '10ER', '6ER',
+                // April Ergänzungen
+                'EIER 10ER FL OKT', 'EIER FH RES 10ER', '6ER BUNTE EIER',
+                
+                // Getreide & Hülsenfrüchte
+                'LINSEN', 'BULGUR', 'COUSCOUS', 'QUINOA', 'HAFERFLOCKEN', 'MUESLI',
+                'ROTE LINSEN', 'KICHERERBSEN', 'BOHNEN', 'ERBSEN', 'URKORN MUESLI',
+                'FLOHSAMEN', 'CHIA SAMEN', 'LEINSAMEN',
+                
+                // Öl & Essig
+                'OEL', 'OLIVENOEL', 'SONNENBLUMENOEL', 'RAPSOEL', 'ESSIG', 'REISESSIG',
+                'KOKOSFETT', 'KOKOSM.FETTRED',
+                // April Ergänzungen
+                'PALM.DG OLIVE',
+                
+                // Zucker & Salz
+                'ZUCKER', 'SALZ', 'JODSALZ', 'ALPENJODSALZ', 'WUERFELZUCKER', 'PUDERZUCKER',
+                'FEINSTER ZUCKER',
+                
+                // Honig & Aufstriche
+                'HONIG', 'MARMELADE', 'NUTELLA', 'KONFITUE', 'KONF.', 'BROTAUFSTRICH',
+                'IMKER HONIG', 'BLUETENHONIG', 'GEBIRGSBL.HONIG', 'SALBEI-HONIG',
+                // April Ergänzungen
+                'ERDBEER KONFITUE', 'DIB BLUETENHONIG'
+            ],
+            
+            'Gewürze & Saucen': [
+                // Gewürze
+                'GEWUERZE', 'PFEFFER', 'CURRY', 'PAPRIKA', 'CHILI', 'BASILIKUM',
+                'ROSMARIN', 'KRAEUTER', 'ZWIEBEL-KRAEUTER', 'GARTENKR', 'CURRY PULVER',
+                'CHILIPULVER', 'PFEFFER SCHWARZ', 'SWEET PAPRIKA', 'SESAM',
+                // April Ergänzungen
+                'KRAEUTER ORIG.',
+                
+                // Saucen & Dressings
+                'KETCHUP', 'MAYONNAISE', 'SENF', 'BBQ SAUCE', 'REMOULADE', 'MIRACEL WHIP',
+                'SALAT MAYONNAISE', 'KNOBLAUCHSAUCE', 'SCHASCHLIKSAUCE', 'COCKTAILSAUCE',
+                'TOMATENKETCHUP', 'TOMATO KETCHUP', 'KNOBL. SAUCE', 'SAUCE ZU BRATEN',
+                // April Ergänzungen
+                'SCHLEFI BORDELAI', 'SCHLEFI TOMATE',
+                
+                // Brühen & Würzmittel
+                'BOUILLON', 'BRUEHE', 'MAGGI', 'DELI. BRUEHE', 'GEMUESE BOUILLON',
+                'HUEHNERSUPPE', 'CLASSIC WUERFEL', 'SK BLOCK KRAEUT',
+                // April Ergänzungen
+                'BOUIL.RIND'
+            ],
+            
+            'Fertiggerichte & Konserven': [
+                'PIZZA', 'FISCHSTAEBCHEN', 'CHICKEN NUGGETS', 'SCHUPFNUDELN',
+                'RAVIOLI', 'GOLDMAIS', 'ERBSEN', 'MAIS', 'ZUCKERMAIS', 'ERBSEN MOEHRCHEN',
+                'ERBSEN M.KAROTT', 'TOMATEN DOSE', 'SCHAELTOMATEN', 'PASSIERTE TOMATE',
+                'STUECKIGE TOMATE', 'SAUERKRAUT', 'GURKEN', 'BOHNEN', 'LINSEN DOSE',
+                'KICHERERBSEN', 'CHAMPIGNONS DOSE', 'THUNFISCH', 'SARDINEN', 'HERINGSFILET',
+                'ANANAS DOSE', 'ANANASSCHEIBEN', 'ANANAS CHUNKS', 'NUDELN IN TOMAT',
+                'MIN HUHN NU', 'GEMUESE RAVIOLI', 'GNOCCHI', 'REIBEKUCHENTEIG',
+                // April Ergänzungen
+                '10 FISCHSTAEBCH.', '1-2-3 STEAK FRIT'
+            ],
+            
+            'Fisch & Meeresfrüchte': [
+                'LACHS', 'FORELLE', 'THUNFISCH', 'GARNELE', 'KRABBEN', 'MUSCHELN',
+                'TINTENFISCH', 'KABELJAU', 'SEELACHS', 'HERING', 'MAKRELE', 'SARDINE',
+                'FISCHFILET', 'RAEUCHERLACHS', 'MATJES', 'ROLLMOPS', 'BISMARCKHERING',
+                'LIEBLINGS LACHS', 'MEIN LIEB. LACHS', 'RAEUCHER-LACHS', 'RAEUCHERL',
+                'BIO RAEUCHERLACH', 'AUSLESE CLASSIC'
+            ],
+            
+            'Haushalt & Hygiene': [
+                // Hygieneartikel
+                'ALWAYS', 'SENSODYNE', 'ZAHNPASTA', 'SHAMPOO', 'DUSCHE', 'SEIFE',
+                'DEO', 'RASIERER', 'GILLETTE', 'PFLEGEDUSCHE', 'MUNDWASSER', 'MUNDSPUELUNG',
+                'ZAHNSEIDE', 'HANDCREME', 'BODYLOTION', 'GESICHTSCREME', 'WATTESTAEBCHEN',
+                'FEUCHTTUCH', 'MEN EXPERT', 'KNEIPP', 'SCHAUMBAD', 'TRAUMBAD',
+                'KINDERZAHNP', 'KINDERZAHNB', 'KINDER SHAMPOO', 'L OREAL',
+                // April Ergänzungen
+                'FRISCH & SENSIT.', 'ALWAYS SLIPEINL', 'ZITRONE HANDSPUE',
+                
+                // Babyartikel
+                'PENATEN', 'PAMPERS', 'WINDELN', 'BUEB.BABY', 'BP PANTS', 'SP PANTS',
+                'FEUCHTTUCH SENS',
+                // April Ergänzungen
+                'SP NB GR.1 NEWB.', 'SP GR. 8 XL 17+',
+                
+                // Putzmittel
+                'TOILETTENPAP', 'KUECHENTUECHER', 'MUELLBTL', 'REINIGER', 'SPUELMITTEL',
+                'WASCHMITTEL', 'SCHWAMM', 'PRIL', 'HYGIENE REINIGER', 'WC REIN',
+                'SAGROTAN', 'MR.PROPER', 'DOM. WCS', 'TOPFREINIGER', 'ENTKALKER',
+                'REINIGER PASTE', 'MASCHINENT. REIN', 'FENSTERTUCH', 'JEANS-BL TUECHER',
+                'LUXUS TOILET.PAP', 'ZEWA'
+            ],
+            
+            'Tiefkühl': [
+                'TK-', 'TIEFKUEHL', 'EISBERGSALAT TK', 'SPINAT TK', 'ERBSEN TK',
+                'POMMES', 'KROKETTEN', 'FISCHFILET TK', 'GARNELEN TK', 'BEEREN TK',
+                'GEMUESE TK', 'KRAEUTERMIX TK', 'FERTIGGERICHT TK', 'EIS', 'SPEISEEIS',
+                'TK BEERENMISCH', 'FREIBAD POMMMES', 'SUESSK. POMMES',
+                // April Ergänzungen
+                'STRACCIATELLA' // Eis
+            ],
+            
+            'Babynahrung': [
+                'KAROT.KART.RIND', 'FR.KAROTT+KARTOF', 'BABYGLAS', 'HIPP', 'ALETE',
+                'BEBIVITA', 'BABYBREI', 'FOLGEMILCH', 'ANFANGSMILCH', 'BABYKEKS',
+                'BAN.APF.ERD.H', 'BAN.,ERDB.,QUIN.', 'RG BIRNE PFL.BR.'
+            ],
+            
+            'Pfand': [
+                'PFAND', 'LEERG', 'EINWEG', 'MEHRWEG',
+                // April Ergänzungen
+                'PFAND 0,25 EURO', 'PFAND 3,30 EUR', 'PFAND 0,15 EUR', 'LEERG. MW V. ST'
+            ],
+            
+            'Sonstiges': []
+        };
 
+        // ===== ERWEITERTE KATEGORISIERUNGSFUNKTION =====
+        function categorizeProduct(productName) {
+            const upperName = productName.toUpperCase();
+            
+            // Durchsuche alle Kategorien
+            for (const [category, keywords] of Object.entries(categoryMapping)) {
+                if (category === 'Sonstiges') continue;
+                
+                for (const keyword of keywords) {
+                    if (upperName.includes(keyword)) {
+                        return category;
+                    }
+                }
+            }
+            
+            // Erweiterte Fallback-Logik
+            if (upperName.includes('DINKELMEHL') || upperName.includes('D DINKEL')) {
+                return 'Backwaren';
+            }
+            if (upperName.includes('BERGBAUERN')) {
+                return 'Milchprodukte';
+            }
+            if (upperName.includes('ORANGE SAFT') || upperName.includes('APFELSAFT')) {
+                return 'Getränke';
+            }
+            if (upperName.match(/\d+ER\s+(BUNTE\s+)?EIER/)) {
+                return 'Grundnahrungsmittel';
+            }
+            if (upperName.includes('EURO') && upperName.includes('PFAND')) {
+                return 'Pfand';
+            }
+            if (upperName.includes('JOGHURT') || upperName.includes('JOGH')) {
+                return 'Milchprodukte';
+            }
+            if (upperName.includes('WURST') || upperName.includes('SCHINKEN')) {
+                return 'Fleisch & Wurst';
+            }
+            if (upperName.includes('CHIPS')) {
+                return 'Süßwaren & Snacks';
+            }
+            
+            return 'Sonstiges';
+        }
 
-        // Initialize the app
+        // ===== VERBESSERTER PARSER =====
+        function parseEBon(content, fileName) {
+            console.log(`\n=== Parsing ${fileName} ===`);
+            
+            // Extract date from filename
+            const dateMatch = fileName.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+            if (!dateMatch) {
+                console.log('No date found in filename');
+                return null;
+            }
+            
+            const date = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+            console.log('Date:', date);
+            
+            // Clean up content
+            content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            content = content.replace(/^\ufeff/, '');
+            
+            console.log('Content length:', content.length);
+            
+            // Handle single-line format
+            if (content.split('\n').length < 5) {
+                console.log('Detected single-line format, reformatting...');
+                
+                content = content.replace(/\s+(EUR)\s+/g, '\n$1\n');
+                content = content.replace(/\s+(--+)/g, '\n$1\n');
+                content = content.replace(/\s+(==+)/g, '\n$1\n');
+                content = content.replace(/\s+(\*\s*\*)/g, '\n$1');
+                content = content.replace(/\s+(SUMME)/g, '\n$1');
+                content = content.replace(/\s+([A-Z][A-Z\s\.\-]+?)\s+(\d+[,\.]\d{2}\s*[AB]?)/g, '\n$1 $2');
+            }
+            
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            console.log(`Total lines: ${lines.length}`);
+            
+            const items = [];
+            let total = 0;
+            let store = 'REWE';
+            let inProductSection = false;
+            
+            // Detect store
+            if (content.includes('Ennepetal')) {
+                store = 'REWE Ennepetal';
+            } else if (content.includes('Breckerfeld')) {
+                store = 'REWE Breckerfeld';
+            } else if (content.includes('Hagen')) {
+                store = 'REWE Hagen';
+            }
+            
+            // Process lines
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                if (line === 'EUR' && !inProductSection) {
+                    console.log(`Product section starts at line ${i}`);
+                    inProductSection = true;
+                    continue;
+                }
+                
+                if (inProductSection && 
+                    (line.includes('----') || 
+                     line.includes('====') || 
+                     line.includes('SUMME') ||
+                     line.includes('* *') ||
+                     line.includes('Kundenbeleg'))) {
+                    console.log(`Product section ends at line ${i}`);
+                    
+                    if (line.includes('SUMME')) {
+                        const totalMatch = line.match(/SUMME\s+(?:EUR\s+)?(\d+[,\.]\d{2})/);
+                        if (totalMatch) {
+                            total = parseFloat(totalMatch[1].replace(',', '.'));
+                            console.log(`Found total: ${total}`);
+                        }
+                    }
+                    break;
+                }
+                
+                if (!inProductSection) continue;
+                
+                // Skip non-product lines
+                if (line === 'EUR' ||
+                    line.includes('Handeingabe') || 
+                    line.includes('E-Bon') ||
+                    line.includes('Tel.:') ||
+                    line.includes('UID') ||
+                    line.includes('=') ||
+                    line.includes('%') ||
+                    line.includes('Steuer') ||
+                    line.includes('Netto') ||
+                    line.includes('Brutto') ||
+                    line.length < 3) {
+                    continue;
+                }
+                
+                // Match product pattern
+                const productMatch = line.match(/^(.+?)\s+(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
+                
+                if (productMatch) {
+                    const productName = productMatch[1].trim();
+                    const price = parseFloat(productMatch[2].replace(',', '.'));
+                    const taxCategory = productMatch[3] || 'B';
+                    
+                    console.log(`  Found: "${productName}" - ${price}€ [${taxCategory}]`);
+                    
+                    // Validate product
+                    if (price > 0 && price < 1000 && productName.length > 1 &&
+                        !productName.match(/^\d/) &&
+                        !productName.includes('=') &&
+                        !productName.includes('EUR') &&
+                        !productName.includes('AUSZAHLUNG') &&
+                        !productName.includes('Geg.')) {
+                        
+                        const item = {
+                            name: productName.toUpperCase(),
+                            price: price,
+                            quantity: 1,
+                            unitPrice: price,
+                            category: categorizeProduct(productName)
+                        };
+                        
+                        items.push(item);
+                        console.log(`  Added to category: ${item.category}`);
+                    }
+                }
+            }
+            
+            console.log(`Found ${items.length} items`);
+            
+            // Alternative parsing for single-line format
+            if (items.length === 0 && lines.length > 0) {
+                console.log('Trying alternative parsing...');
+                const firstLine = lines[0];
+                
+                const eurIndex = firstLine.indexOf(' EUR ');
+                if (eurIndex > 0) {
+                    const productsPart = firstLine.substring(eurIndex + 5);
+                    const productRegex = /([A-Z][A-Z\s\.\-]+?)\s+(\d+[,\.]\d{2})\s*([AB])?/g;
+                    let match;
+                    
+                    while ((match = productRegex.exec(productsPart)) !== null) {
+                        const productName = match[1].trim();
+                        const price = parseFloat(match[2].replace(',', '.'));
+                        
+                        if (productName.includes('----') || productName.includes('SUMME')) {
+                            break;
+                        }
+                        
+                        if (price > 0 && price < 1000 && productName.length > 1) {
+                            const item = {
+                                name: productName.toUpperCase(),
+                                price: price,
+                                quantity: 1,
+                                unitPrice: price,
+                                category: categorizeProduct(productName)
+                            };
+                            
+                            items.push(item);
+                            console.log(`Alternative parse: ${productName} - ${price}€`);
+                        }
+                    }
+                }
+            }
+            
+            // Find total if not found
+            if (!total && items.length > 0) {
+                const totalMatch = content.match(/(?:SUMME|Gesamtbetrag)[^\d]*(\d+[,\.]\d{2})/);
+                if (totalMatch) {
+                    total = parseFloat(totalMatch[1].replace(',', '.'));
+                } else {
+                    total = items.reduce((sum, item) => sum + item.price, 0);
+                }
+            }
+            
+            if (items.length === 0) {
+                console.log('No items found');
+                return null;
+            }
+            
+            return {
+                date: date,
+                store: store,
+                total: total,
+                items: items
+            };
+        }
+
+        // ===== INITIALIZATION =====
         window.onload = function() {
             if (CLIENT_ID) {
                 document.getElementById('setupSection').style.display = 'none';
@@ -836,11 +1123,11 @@ const improvedCategoryMapping = {
                 document.getElementById('authSection').style.display = 'none';
             }
             
-            // Set current month as default filter
+            // Set current month as default
             const now = new Date();
             document.getElementById('dateFilter').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             
-            // Load stored data if available
+            // Load stored data
             loadStoredData();
         };
 
@@ -849,7 +1136,7 @@ const improvedCategoryMapping = {
             if (clientId) {
                 CLIENT_ID = clientId;
                 localStorage.setItem('googleClientId', clientId);
-                location.reload(); // Reload to initialize with new client ID
+                location.reload();
             } else {
                 showError('Bitte geben Sie eine gültige Client ID ein.');
             }
@@ -873,7 +1160,6 @@ const improvedCategoryMapping = {
                     }
                     updateAuthStatus(true);
                     if (processedFiles.size === 0) {
-                        // First time sync
                         syncWithDrive();
                     }
                 },
@@ -886,7 +1172,6 @@ const improvedCategoryMapping = {
             if (gapiInited && gisInited) {
                 document.getElementById('authorizeButton').disabled = false;
                 
-                // Check if we have a valid token
                 if (gapi.client.getToken() !== null) {
                     updateAuthStatus(true);
                 }
@@ -964,24 +1249,18 @@ const improvedCategoryMapping = {
             try {
                 console.log('=== Starting sync ===');
                 
-                // List all files in the folder
                 syncStatus.textContent = 'Lade Dateiliste...';
                 progressFill.style.width = '10%';
                 
                 const files = await listAllFiles();
                 console.log(`Found ${files.length} files in Google Drive`);
                 
-                // Filter out already processed files
                 const newFiles = files.filter(file => !processedFiles.has(file.id));
                 console.log(`${newFiles.length} new files to process`);
                 
                 if (newFiles.length === 0) {
                     syncStatus.textContent = 'Keine neuen E-Bons gefunden.';
                     progressFill.style.width = '100%';
-                    
-                    // Show current data if any
-                    console.log('Current receipts:', allReceipts);
-                    console.log('Current products:', allProducts);
                     
                     if (allReceipts.length > 0) {
                         updateView();
@@ -997,7 +1276,6 @@ const improvedCategoryMapping = {
                 
                 syncStatus.textContent = `${newFiles.length} neue E-Bons gefunden. Verarbeite...`;
                 
-                // Process each file
                 let processed = 0;
                 let successCount = 0;
                 
@@ -1026,7 +1304,6 @@ const improvedCategoryMapping = {
                 
                 console.log(`\nProcessing complete: ${successCount} of ${newFiles.length} files parsed successfully`);
                 
-                // Process products and save data
                 syncStatus.textContent = 'Analysiere Produkte...';
                 progressFill.style.width = '95%';
                 
@@ -1066,8 +1343,6 @@ const improvedCategoryMapping = {
                         pageToken: pageToken
                     });
                     
-                    console.log('API Response:', response);
-                    
                     if (response.result && response.result.files) {
                         files.push(...response.result.files);
                         console.log(`Found ${response.result.files.length} files in this batch`);
@@ -1077,7 +1352,6 @@ const improvedCategoryMapping = {
                 } while (pageToken);
                 
                 console.log('Total files found:', files.length);
-                console.log('Files:', files);
                 
             } catch (error) {
                 console.error('Error listing files:', error);
@@ -1089,26 +1363,13 @@ const improvedCategoryMapping = {
 
         async function processEBon(file) {
             try {
-                // Export the Google Doc as plain text
                 const response = await gapi.client.drive.files.export({
                     fileId: file.id,
                     mimeType: 'text/plain'
                 });
                 
                 const content = response.body;
-                
-                // Debug: Log the content to see what we're getting
-                console.log(`Processing ${file.name}:`);
-                console.log('Raw content:', content.substring(0, 500) + '...');
-                
-                // Parse the e-bon
                 const receipt = parseEBon(content, file.name);
-                
-                if (receipt) {
-                    console.log('Parsed receipt:', receipt);
-                } else {
-                    console.log('Failed to parse receipt');
-                }
                 
                 return receipt;
             } catch (error) {
@@ -1117,293 +1378,43 @@ const improvedCategoryMapping = {
             }
         }
 
-        function parseEBon(content, fileName) {
-            console.log(`\n=== Parsing ${fileName} ===`);
-            
-            // Extract date from filename
-            const dateMatch = fileName.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-            if (!dateMatch) {
-                console.log('No date found in filename');
-                return null;
-            }
-            
-            const date = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
-            console.log('Date:', date);
-            
-            // Clean up content - normalize whitespace
-            content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            // Remove BOM if present
-            content = content.replace(/^\ufeff/, '');
-            
-            console.log('Original content length:', content.length);
-            console.log('First 200 chars:', content.substring(0, 200));
-            
-            // Special handling for single-line format
-            // Look for pattern where everything is on one line
-            if (content.split('\n').length < 5) {
-                console.log('Detected single-line format, applying special processing...');
-                
-                // Add line breaks before key markers
-                content = content.replace(/\s+(EUR)\s+/g, '\n$1\n');
-                content = content.replace(/\s+(--+)/g, '\n$1\n');
-                content = content.replace(/\s+(==+)/g, '\n$1\n');
-                content = content.replace(/\s+(\*\s*\*)/g, '\n$1');
-                content = content.replace(/\s+(SUMME)/g, '\n$1');
-                
-                // Split products - look for pattern: PRODUCTNAME PRICE [A/B]
-                // This regex looks for uppercase product names followed by price and optional tax category
-                content = content.replace(/\s+([A-Z][A-Z\s\.\-]+?)\s+(\d+[,\.]\d{2}\s*[AB]?)/g, '\n$1 $2');
-                
-                console.log('After line break additions:', content.substring(0, 500));
-            }
-            
-            // Split content into lines
-            let lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-            
-            console.log(`Total lines after preprocessing: ${lines.length}`);
-            if (lines.length < 30) {
-                console.log('All lines:', lines.map((l, i) => `${i}: ${l}`));
-            } else {
-                console.log('First 30 lines:', lines.slice(0, 30).map((l, i) => `${i}: ${l}`));
-            }
-            
-            const items = [];
-            let total = 0;
-            let store = 'REWE';
-            let inProductSection = false;
-            
-            // Look for store info
-            if (content.includes('Ennepetal')) {
-                store = 'REWE Ennepetal';
-            } else if (content.includes('Breckerfeld')) {
-                store = 'REWE Breckerfeld';
-            } else if (content.includes('Hagen')) {
-                store = 'REWE Hagen';
-            }
-            
-            // Process each line
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Start of product section at EUR marker
-                if (line === 'EUR' && !inProductSection) {
-                    console.log(`\nProduct section starts at line ${i}`);
-                    inProductSection = true;
-                    continue;
-                }
-                
-                // End of product section
-                if (inProductSection && 
-                    (line.includes('----') || 
-                     line.includes('====') || 
-                     line.includes('SUMME') ||
-                     line.includes('* *') ||
-                     line.includes('Kundenbeleg'))) {
-                    console.log(`Product section ends at line ${i}: "${line}"`);
-                    
-                    if (line.includes('SUMME')) {
-                        const totalMatch = line.match(/SUMME\s+(?:EUR\s+)?(\d+[,\.]\d{2})/);
-                        if (totalMatch) {
-                            total = parseFloat(totalMatch[1].replace(',', '.'));
-                            console.log(`Found total: ${total}`);
-                        }
-                    }
-                    break;
-                }
-                
-                if (!inProductSection) continue;
-                
-                console.log(`\nProcessing line ${i}: "${line}"`);
-                
-                // Skip non-product lines
-                if (line === 'EUR' ||
-                    line.includes('Handeingabe') || 
-                    line.includes('E-Bon') ||
-                    line.includes('Tel.:') ||
-                    line.includes('UID') ||
-                    line.includes('=') ||
-                    line.includes('%') ||
-                    line.includes('Steuer') ||
-                    line.includes('Netto') ||
-                    line.includes('Brutto') ||
-                    line.length < 3) {
-                    console.log(`  → Skipped`);
-                    continue;
-                }
-                
-                // Try to match product pattern: NAME PRICE [TAX]
-                const productMatch = line.match(/^(.+?)\s+(\d+[,\.]\d{2})(?:\s+([AB]))?$/);
-                
-                if (productMatch) {
-                    const productName = productMatch[1].trim();
-                    const price = parseFloat(productMatch[2].replace(',', '.'));
-                    const taxCategory = productMatch[3] || 'B';
-                    
-                    console.log(`  → MATCHED: "${productName}" - ${price}€ [${taxCategory}]`);
-                    
-                    // Validate product
-                    if (price > 0 && price < 1000 && productName.length > 1 &&
-                        !productName.match(/^\d/) && // Don't start with number
-                        !productName.includes('=') &&
-                        !productName.includes('EUR')) {
-                        
-                        const item = {
-                            name: productName.toUpperCase(),
-                            price: price,
-                            quantity: 1,
-                            unitPrice: price,
-                            category: categorizeProduct(productName)
+        function processProducts() {
+            allProducts = [];
+            const productMap = {};
+
+            allReceipts.forEach(receipt => {
+                receipt.items.forEach(item => {
+                    if (!productMap[item.name]) {
+                        productMap[item.name] = {
+                            name: item.name,
+                            category: item.category || categorizeProduct(item.name),
+                            purchases: [],
+                            totalQuantity: 0,
+                            totalSpent: 0
                         };
-                        
-                        items.push(item);
-                        console.log(`  → ADDED:`, item);
-                    } else {
-                        console.log(`  → Invalid product (validation failed)`);
                     }
-                } else {
-                    console.log(`  → No match for product pattern`);
-                }
-            }
-            
-            console.log(`\n=== SUMMARY ===`);
-            console.log(`Found ${items.length} items`);
-            
-            // If no items found, try alternative parsing for single-line format
-            if (items.length === 0 && lines.length > 0) {
-                console.log('\nTrying alternative parsing for first line...');
-                const firstLine = lines[0];
-                
-                // Look for EUR marker and split from there
-                const eurIndex = firstLine.indexOf(' EUR ');
-                if (eurIndex > 0) {
-                    const productsPart = firstLine.substring(eurIndex + 5);
-                    console.log('Products part:', productsPart.substring(0, 100) + '...');
                     
-                    // Use regex to find all products in the string
-                    const productRegex = /([A-Z][A-Z\s\.\-]+?)\s+(\d+[,\.]\d{2})\s*([AB])?/g;
-                    let match;
+                    productMap[item.name].purchases.push({
+                        date: receipt.date,
+                        price: item.price,
+                        quantity: item.quantity || 1,
+                        unitPrice: (item.quantity || 1) > 0 ? item.price / (item.quantity || 1) : item.price
+                    });
                     
-                    while ((match = productRegex.exec(productsPart)) !== null) {
-                        const productName = match[1].trim();
-                        const price = parseFloat(match[2].replace(',', '.'));
-                        const taxCategory = match[3] || 'B';
-                        
-                        // Stop at SUMME or separator
-                        if (productName.includes('----') || productName.includes('SUMME')) {
-                            break;
-                        }
-                        
-                        if (price > 0 && price < 1000 && productName.length > 1) {
-                            const item = {
-                                name: productName.toUpperCase(),
-                                price: price,
-                                quantity: 1,
-                                unitPrice: price,
-                                category: categorizeProduct(productName)
-                            };
-                            
-                            items.push(item);
-                            console.log(`Alternative parse found: ${productName} - ${price}€`);
-                        }
-                    }
-                }
-            }
+                    productMap[item.name].totalQuantity += (item.quantity || 1);
+                    productMap[item.name].totalSpent += item.price;
+                });
+            });
+
+            allProducts = Object.values(productMap);
             
-            // Find total if not already found
-            if (!total && items.length > 0) {
-                const totalMatch = content.match(/(?:SUMME|Gesamtbetrag)[^\d]*(\d+[,\.]\d{2})/);
-                if (totalMatch) {
-                    total = parseFloat(totalMatch[1].replace(',', '.'));
-                    console.log(`Found total: ${total}`);
-                } else {
-                    total = items.reduce((sum, item) => sum + item.price, 0);
-                    console.log(`Calculated total: ${total}`);
-                }
-            }
+            allProducts.forEach(product => {
+                productCategories[product.name] = product.category;
+            });
             
-            if (items.length === 0) {
-                console.log('No items found, returning null');
-                return null;
-            }
-            
-            const receipt = {
-                date: date,
-                store: store,
-                total: total,
-                items: items
-            };
-            
-            console.log('\nFinal receipt:', JSON.stringify(receipt, null, 2));
-            return receipt;
+            updateCategoryFilter();
         }
 
-// Hilfsfunktion zur besseren Kategorisierung
-function categorizeProduct(productName) {
-    const upperName = productName.toUpperCase();
-    
-    // Gehe alle Kategorien durch (außer "Sonstiges")
-    for (const [category, keywords] of Object.entries(improvedCategoryMapping)) {
-        if (category === 'Sonstiges') continue;
-        
-        // Prüfe ob eines der Keywords im Produktnamen enthalten ist
-        for (const keyword of keywords) {
-            if (upperName.includes(keyword)) {
-                return category;
-            }
-        }
-    }
-    
-    // Zusätzliche Logik für zusammengesetzte Produkte
-    // (z.B. "ORANGE SAFT 2,99 B BERGBAUERNMI 3,5 1,49 B DINKELMEHL T1050")
-    if (upperName.includes('DINKELMEHL') || upperName.includes('D DINKEL')) {
-        return 'Backwaren';
-    }
-    if (upperName.includes('BERGBAUERNMI')) {
-        return 'Milchprodukte';
-    }
-    if (upperName.includes('ORANGE SAFT') || upperName.includes('APFELSAFT')) {
-        return 'Getränke';
-    }
-    
-    // Spezielle Muster erkennen
-    if (upperName.match(/\d+ER\s+(BUNTE\s+)?EIER/)) {
-        return 'Grundnahrungsmittel'; // Eier
-    }
-    if (upperName.includes('EURO') && upperName.includes('PFAND')) {
-        return 'Pfand';
-    }
-    
-    // Falls nichts gefunden wurde
-    return 'Sonstiges';
-}
-
-// Beispiel-Test mit einigen Produkten aus der Liste
-const testProducts = [
-    'CAFFE CREMA CLA.',
-    'EDUSCHO CAFFEE',
-    'QUALITA ROSSA',
-    'DALLMAYR CLASSIC',
-    'NESCAFE CLASSIC',
-    'TROPISCHE MISCH.',
-    'W.RIESE COLOR',
-    'DIB BLUETENHONIG',
-    'KINDERJOG.HIMBEE',
-    'DUPLO BIG PACK',
-    'KETCHUP',
-    'SENF MITTELSCHAR',
-    'CURRY PULVER'
-];
-
-console.log('Test der verbesserten Kategorisierung:\n');
-testProducts.forEach(product => {
-    const category = categorizeProduct(product);
-    console.log(`${product.padEnd(25)} → ${category}`);
-});
-
-// Export für die HTML-Datei
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { improvedCategoryMapping, categorizeProduct };
-}
         function loadStoredData() {
             const storedData = localStorage.getItem('reweEbonData');
             if (storedData) {
@@ -1442,7 +1453,7 @@ if (typeof module !== 'undefined' && module.exports) {
             }, 5000);
         }
 
-        // All the chart and view update functions remain the same...
+        // ===== VIEW UPDATE FUNCTIONS =====
         function updateCategoryFilter() {
             const categories = [...new Set(Object.values(productCategories))];
             const select = document.getElementById('categoryFilter');
@@ -1694,7 +1705,6 @@ if (typeof module !== 'undefined' && module.exports) {
             const filterContainer = document.getElementById('productFilter');
             filterContainer.innerHTML = '';
             
-            // Find products that exist in the data
             const existingProducts = popularProducts.filter(product => 
                 receipts.some(r => r.items.some(i => i.name.includes(product)))
             );
