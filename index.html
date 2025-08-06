@@ -575,96 +575,248 @@
         let charts = {};
         let processedFiles = new Set(JSON.parse(localStorage.getItem('processedFiles') || '[]'));
 
-        // Product category mapping
-        const categoryMapping = {
-            'Obst & Gemüse': [
-                'BANANE', 'APFEL', 'KIWI', 'ORANGE', 'MANDARINE', 'HEIDELBEER', 
-                'MANGO', 'CHERRYROMATOMATE', 'SALATGURKE', 'PAPRIKA', 'KARTOFFEL',
-                'KAROTTE', 'ZWIEBEL', 'AVOCADO', 'ZITRONE', 'HIMBEERE', 'KIRSCHEN',
-                'NEKTARINE', 'PFIRSICH', 'TRAUBE', 'MELONE', 'ANANAS', 'APRIKOSE',
-                'KOPFSALAT', 'FELDSALAT', 'LAUCHZWIEBEL', 'INGWER', 'KNOBLAUCH',
-                'PORREE', 'CHAMPIGNON', 'AUBERGINE', 'ZUCCHINI', 'BROKKOLI', 'KOHLRABI',
-                'KUERBIS', 'TOMATE', 'GURKE', 'ERDBEERE', 'BLAUBEERE', 'WEINTRAUBE',
-                'BIRNE', 'PFLAUME', 'SALAT', 'SPINAT', 'RUCOLA', 'RADIESCHEN',
-                'KAROTT', 'KARTOF', 'FR.KAROTT'
-            ],
-            'Fleisch & Wurst': [
-                'FLEISCHWURST', 'WIENER', 'HACKFLEISCH', 'PUTENBRUST', 'BRATWURST',
-                'HAEHNCHEN', 'SCHINKEN', 'SALAMI', 'METTWURST', 'BOCKWURST', 'BACON',
-                'MINUTENSTEAK', 'RIND', 'SCHWEIN', 'GEFLÜGEL', 'CHICKEN', 'STEAK',
-                'GULASCH', 'LEBERWURST', 'LYONER', 'ROSTBRATWURST', 'SCHINKENWURST',
-                'TEEWURST', 'CERVELATWURST', 'MORTADELLA', 'ENTRECOTE', 'FILET',
-                'KOTELETT', 'LAMMFLEISCH', 'WILDFLEISCH', 'KASSELER', 'SPECK'
-            ],
-            'Milchprodukte': [
-                'BERGBAUERNMI', 'JOGHURT', 'KINDERJOG', 'BUTTER', 'SCHLAGSAHNE',
-                'QUARK', 'KAESE', 'GOUDA', 'EMMENTALER', 'MOZZARELLA', 'FETA',
-                'CREME FRAICHE', 'MILCH', 'SAHNE', 'FRUCHTQUARK', 'DICKMILCH',
-                'KEFIR', 'STREICHFETT', 'CAMEMBERT', 'FRISCHKAESE', 'PHILADELPHIA',
-                'ALMETTE', 'GERAMONT', 'BEEMSTER', 'CAMPINA', 'WESTLITE', 'GRAEDDOST',
-                'BUTTERMILCH', 'SCHMAND', 'MASCARPONE', 'RICOTTA', 'PARMESAN',
-                'KALINKA'
-            ],
-            'Backwaren': [
-                'DINKELMEHL', 'DINKEL-BROETCHEN', 'BROT', 'BROETCHEN', 'TOAST',
-                'ZWIEBACK', 'KNAECKE', 'BAGUETTE', 'LAUGENB', 'SONNTAGSBROETCH',
-                'HEFE', 'MEHL', 'WEIZENMEHL', 'ROGGENMEHL', 'VOLLKORNBROT',
-                'PUMPERNICKEL', 'CIABATTA', 'CROISSANT', 'BACKPULVER', 'VANILLEZUCKER'
-            ],
-            'Getränke': [
-                'COCA COLA', 'SCHLOSSQU', 'VITAMIN SAFT', 'APFELSAFT', 'ORANGENSAFT',
-                'KAFFEE', 'TEE', 'WASSER', 'LEMONAID', 'KAKAO', 'MULTI', 'ENERGY',
-                'SAFT', 'GETRAENK', 'LIMONADE', 'BIER', 'VELTINS',
-                'FIEGE', 'LANDPARK', 'KROM', 'MINERALWASSER', 'SPRUDEL', 'EISTEE',
-                'SMOOTHIE', 'MILCHSHAKE', 'TRAUBENSAFT', 'KIRSCHSAFT', 'ANANASSAFT'
-            ],
-            'Pfand': [
-                'PFAND', 'LEERG', 'EINWEG', 'MEHRWEG'
-            ],
-            'Süßwaren & Snacks': [
-                'SCHOKOLADE', 'HARIBO', 'KINDER', 'DUPLO', 'KITKAT', 'LION',
-                'PRINZENROLLE', 'KEKS', 'CHIPS', 'CRUNCHIPS', 'SALZSTANGEN',
-                'PRINGLES', 'NUSS', 'ERDNUSS', 'POPCORN', 'TOFFIFEE', 'SCHOKOBONS',
-                'ALPENMILCH', 'VOLLMILCH', 'HASELNUSS', 'RIEGEL', 'GUMMIBAERCHEN',
-                'LAKRITZ', 'BONBON', 'LUTSCHER', 'MARSHMALLOW', 'WAFFEL', 'BROWNIE'
-            ],
-            'Haushalt & Hygiene': [
-                'ALWAYS', 'SENSODYNE', 'ZAHNPASTA', 'SHAMPOO', 'DUSCHE', 'SEIFE',
-                'TOILETTENPAP', 'KUECHENTUECHER', 'MUELLBTL', 'REINIGER', 'SPUELMITTEL',
-                'WASCHMITTEL', 'FEUCHTTUCH', 'WATTESTAEBCHEN', 'PENATEN', 'PAMPERS',
-                'WINDELN', 'DEO', 'RASIERER', 'GILLETTE', 'PFLEGEDUSCHE', 'MUNDWASSER',
-                'ZAHNSEIDE', 'HANDCREME', 'BODYLOTION', 'GESICHTSCREME', 'SCHWAMM'
-            ],
-            'Fertiggerichte & Konserven': [
-                'PIZZA', 'FISCHSTAEBCHEN', 'CHICKEN NUGGETS', 'SCHUPFNUDELN',
-                'RAVIOLI', 'GOLDMAIS', 'ERBSEN', 'TOMATEN', 'SCHAELTOMATEN',
-                'PASSIERTE TOMATE', 'STUECKIGE TOMATE', 'SAUERKRAUT', 'GURKEN',
-                'BOHNEN', 'LINSEN DOSE', 'KICHERERBSEN', 'CHAMPIGNONS DOSE',
-                'THUNFISCH', 'SARDINEN', 'HERINGSFILET', 'ANANAS DOSE'
-            ],
-            'Grundnahrungsmittel': [
-                'NUDELN', 'REIS', 'FUSILLI', 'SPAGHETTI', 'PENNE', 'SPIRALEN',
-                'LASAGNE', 'EIER', 'ZUCKER', 'SALZ', 'OEL', 'ESSIG', 'GEWUERZE',
-                'PFEFFER', 'CURRY', 'PAPRIKA', 'BASMATI', 'LINSEN', 'BULGUR',
-                'COUSCOUS', 'QUINOA', 'HAFERFLOCKEN', 'MUESLI', 'OLIVENOEL',
-                'SONNENBLUMENOEL', 'RAPSOEL', 'HONIG', 'MARMELADE', 'NUTELLA'
-            ],
-            'Tiefkühl': [
-                'TK-', 'TIEFKUEHL', 'EISBERGSALAT TK', 'SPINAT TK', 'ERBSEN TK',
-                'POMMES', 'KROKETTEN', 'FISCHFILET TK', 'GARNELEN TK', 'BEEREN TK',
-                'GEMUESE TK', 'KRAEUTERMIX TK', 'FERTIGGERICHT TK', 'EIS', 'SPEISEEIS'
-            ],
-            'Babynahrung': [
-                'KAROT.KART.RIND', 'BABYGLAS', 'HIPP', 'ALETE', 'BEBIVITA',
-                'BABYBREI', 'FOLGEMILCH', 'ANFANGSMILCH', 'BABYKEKS'
-            ],
-            'Fisch & Meeresfrüchte': [
-                'LACHS', 'FORELLE', 'THUNFISCH', 'GARNELE', 'KRABBEN', 'MUSCHELN',
-                'TINTENFISCH', 'KABELJAU', 'SEELACHS', 'HERING', 'MAKRELE', 'SARDINE',
-                'FISCHFILET', 'RAEUCHERLACHS', 'MATJES', 'ROLLMOPS', 'BISMARCKHERING'
-            ],
-            'Sonstiges': []
-        };
+        // Verbesserte Kategorisierung für REWE E-Bon Analyzer
+const improvedCategoryMapping = {
+    'Obst & Gemüse': [
+        // Obst
+        'BANANE', 'APFEL', 'KIWI', 'ORANGE', 'MANDARINE', 'HEIDELBEER', 'HIMBEERE',
+        'MANGO', 'ERDBEERE', 'KIRSCHEN', 'NEKTARINE', 'PFIRSICH', 'TRAUBE', 'MELONE',
+        'ANANAS', 'APRIKOSE', 'BIRNE', 'PFLAUME', 'WEINTRAUBE', 'BLAUBEERE', 'ZITRONE',
+        'WASSERMELONE', 'CANTALOUPE', 'HONIGMELONE', 'GRAPEFRUIT', 'LIMETTE', 'BEEREN',
+        'ZWETSCHGE', 'TROPISCHE MISCH', 'TROPISCHE FRUCHT', 'GARTEN ERDBEEREN',
+        'EXTRA ERDBEERE', 'EXTRA HIMBEERE', 'EXTRA HEIDELBEER', 'EXTRA 3 BEEREN',
+        
+        // Gemüse
+        'TOMATE', 'CHERRYROMATOMATE', 'SALATGURKE', 'GURKE', 'PAPRIKA', 'KARTOFFEL',
+        'KAROTTE', 'ZWIEBEL', 'AVOCADO', 'INGWER', 'KNOBLAUCH', 'PORREE', 'LAUCH',
+        'CHAMPIGNON', 'AUBERGINE', 'ZUCCHINI', 'BROKKOLI', 'BROCCOLI', 'KOHLRABI',
+        'KUERBIS', 'KOPFSALAT', 'FELDSALAT', 'EISBERGSALAT', 'SALAT', 'SPINAT',
+        'RUCOLA', 'RADIESCHEN', 'LAUCHZWIEBEL', 'BABYSPINAT', 'SALAT BUNT',
+        'MINIRISPE', 'SALAT KOPF',
+        
+        // Konserven/Verarbeitetes Gemüse (aber noch Gemüse)
+        'STUECKIGE TOMATE', 'PASSIERTE TOMATE', 'SCHAELTOMATEN', 'TOMATENMARK',
+        'POLPA FINE', 'GEH. TOMATEN', 'TOMATEN PASSIERT', 'TOMATEN STUECKIG',
+        'SAUERKIRSCHEN', 'APFELMUS', 'APFELMARK', 'GURKENHAPPEN', 'SAUERKRAUT',
+        'CORNICHONS', 'SCHLES.GURKENHAP', 'SCH.GURKENHAPPEN'
+    ],
+    
+    'Fleisch & Wurst': [
+        'FLEISCHWURST', 'WIENER', 'HACKFLEISCH', 'PUTENBRUST', 'BRATWURST',
+        'HAEHNCHEN', 'HAEHNCHENSCH', 'SCHINKEN', 'SALAMI', 'METTWURST', 'BOCKWURST',
+        'BACON', 'MINUTENSTEAK', 'RIND', 'SCHWEIN', 'GEFLÜGEL', 'CHICKEN',
+        'STEAK', 'GULASCH', 'LEBERWURST', 'LYONER', 'ROSTBRATWURST', 'SCHINKENWURST',
+        'TEEWURST', 'CERVELATWURST', 'MORTADELLA', 'ENTRECOTE', 'FILET',
+        'KOTELETT', 'LAMMFLEISCH', 'WILDFLEISCH', 'KASSELER', 'SPECK',
+        'KRAKAUER', 'FRIKADELLE', 'ROSTBRATW', 'RUECKENSTEAK', 'GRILLIES',
+        'CHICKEN NUGGETS', 'CHICKEN DRUMS', 'CHICKEN WINGS', 'HA-HAEHN'
+    ],
+    
+    'Milchprodukte': [
+        // Milch & Sahne
+        'BERGBAUERNMI', 'MILCH', 'WEIDEMILCH', 'SAHNE', 'SCHLAGSAHNE', 'CREME FRAICHE',
+        'SCHMAND', 'SAHNSTEIFE', 'SAHNESTEIFE',
+        
+        // Joghurt & Quark
+        'JOGHURT', 'KINDERJOG', 'KINDERJOGHURT', 'FRUCHTJOGHURT', 'FRUCHTQUARK',
+        'QUARK', 'DICKMILCH', 'KEFIR', 'KALINKA KEFIR', 'BUTTERMILCH',
+        'JOGURT', 'NATURJOGHURT', 'FRUCHTJO', 'GOETTERSP', 'MUELLERMILCH',
+        'MONTE', 'ZOTT MONTE', 'SAHNEPUDDING', 'PUDDING',
+        
+        // Käse
+        'KAESE', 'GOUDA', 'EMMENTALER', 'MOZZARELLA', 'FETA', 'CAMEMBERT',
+        'FRISCHKAESE', 'PHILADELPHIA', 'ALMETTE', 'GERAMONT', 'BEEMSTER',
+        'CAMPINA', 'WESTLITE', 'GRAEDDOST', 'PARMESAN', 'RICOTTA', 'MASCARPONE',
+        'BRESSO', 'EXQUISA', 'BUKO', 'MIREE', 'SALAKIS', 'PATROS', 'REIBEKAESE',
+        'GERIEBEN',
+        
+        // Butter & Streichfette
+        'BUTTER', 'MARKENBUTTER', 'WEIDEBUTTER', 'STREICHFETT', 'IRISCHE BUTTER',
+        'RAMA', 'DELI REFORM'
+    ],
+    
+    'Backwaren': [
+        'BROT', 'BROETCHEN', 'TOAST', 'BAGUETTE', 'LAUGENB', 'SONNTAGSBROETCH',
+        'DINKEL-BROETCHEN', 'DINKELMEHL', 'MEHL', 'WEIZENMEHL', 'ROGGENMEHL',
+        'VOLLKORNBROT', 'PUMPERNICKEL', 'CIABATTA', 'CROISSANT', 'HEFE',
+        'BACKPULVER', 'VANILLEZUCKER', 'VANILLINZUCKER', 'BACKIN', 'KNAECKE',
+        'ZWIEBACK', 'KNUSPERBROT', 'DINKEL SANDWICH', 'DINKEL 630',
+        'KOERNER BALANCE', 'ROGGEN BROETCH'
+    ],
+    
+    'Getränke': [
+        // Wasser & Säfte
+        'COCA COLA', 'COLA', 'SCHLOSSQU', 'VITAMIN SAFT', 'APFELSAFT', 'ORANGENSAFT',
+        'SAFT', 'WASSER', 'LEMONAID', 'MINERALWASSER', 'SPRUDEL', 'HEILWASSER',
+        'TRAUBENSAFT', 'KIRSCHSAFT', 'ANANASSAFT', 'MULTI', 'ROTER MULTI',
+        'APFELSINENSAFT', 'ORANGE SAFT', 'HOHES C',
+        
+        // Kaffee & Tee
+        'KAFFEE', 'CAFFEE', 'CAFFE CREMA', 'DALLMAYR', 'EDUSCHO', 'PRODOMO',
+        'NESCAFE', 'QUALITA ROSSA', 'TEE', 'MATCHA', 'KAMILLE', 'KAMILLEN TEE',
+        'SALBEI', 'YOGI', 'KRAEUTER ORIG',
+        
+        // Kakao & Milchgetränke
+        'KAKAO', 'CHOCOMEL', 'NESQUIK', 'KAKAOGETRAENK',
+        
+        // Bier & Alkoholfreies
+        'BIER', 'VELTINS', 'FIEGE', 'LANDPARK', 'KROM', 'GREVENSTEINER',
+        'FASSBRAU', 'ENERGY', 'EISTEE', 'SMOOTHIE', 'LIMONADE'
+    ],
+    
+    'Süßwaren & Snacks': [
+        // Schokolade
+        'SCHOKOLADE', 'SCHOKO', 'DUPLO', 'KITKAT', 'LION', 'KINDER',
+        'TOFFIFEE', 'SCHOKOBONS', 'ALPENMILCH', 'VOLLMILCH', 'HASELNUSS',
+        'NUSS-NOUGAT', 'BION.NUSS-NOUGAT', 'KNUSPER NUSS', 'VOLL-NUSS',
+        'EDEL-VOLLMILCH', 'RASPELSCHOKOLADE', 'GLASUR KAKAO', 'MARS', 'TWIX',
+        'CELEBRATIONS', 'RIEGEL', 'HANUTA', 'MONTE SCHOKO', 'CHOCOLAT',
+        
+        // Gummibärchen & Bonbons
+        'HARIBO', 'GUMMIBAERCHEN', 'LAKRITZ', 'BONBON', 'LUTSCHER',
+        'MARSHMALLOW', 'PASTA FRU', 'STARMIX', 'RAINBOW', 'HAPPY COL',
+        'TROPI FRU', 'GOLDBAER', 'YOGHURT GUMS', 'EUKAL', 'LOLLIES',
+        
+        // Kekse & Gebäck
+        'PRINZENROLLE', 'KEKS', 'WAFFEL', 'BROWNIE', 'FRISCHEIWAFFEL',
+        'MINI MAGDALENAS', 'ERDBEERSTREIFEN',
+        
+        // Chips & Salziges
+        'CHIPS', 'CRUNCHIPS', 'PRINGLES', 'SALTLETTS', 'SALZSTANGEN',
+        'POPCORN', 'OFEN CHIPS', 'KESSELCHIPS', 'CHIPSFR', 'RIFFELS',
+        'LAYS', 'SNACK HITS', 'TUC', 'ERDNUESSE', 'OFEN ERDNUESSE'
+    ],
+    
+    'Grundnahrungsmittel': [
+        // Nudeln & Reis
+        'NUDELN', 'REIS', 'FUSILLI', 'SPAGHETTI', 'PENNE', 'SPIRALEN',
+        'LASAGNE', 'BASMATI', 'PASTA', 'FARFALLE', 'ELICHE', 'KORKENZIEHERNUD',
+        'MACCHERONI', 'SPAETZLE', 'COLLEZ.FARFALLE', 'DINKEL SPAGH',
+        'BUCHSTABEN', 'KLEBEREIS', 'HIMALAYA BASMATI', 'HIMALYA BASMATI',
+        
+        // Getreide & Hülsenfrüchte
+        'LINSEN', 'BULGUR', 'COUSCOUS', 'QUINOA', 'HAFERFLOCKEN', 'MUESLI',
+        'ROTE LINSEN', 'KICHERERBSEN', 'BOHNEN', 'ERBSEN', 'URKORN MUESLI',
+        'FLOHSAMEN', 'CHIA SAMEN', 'LEINSAMEN',
+        
+        // Öl & Essig
+        'OEL', 'OLIVENOEL', 'SONNENBLUMENOEL', 'RAPSOEL', 'ESSIG', 'REISESSIG',
+        'KOKOSFETT', 'KOKOSM.FETTRED',
+        
+        // Zucker & Salz
+        'ZUCKER', 'SALZ', 'JODSALZ', 'ALPENJODSALZ', 'WUERFELZUCKER', 'PUDERZUCKER',
+        'FEINSTER ZUCKER',
+        
+        // Honig & Aufstriche
+        'HONIG', 'MARMELADE', 'NUTELLA', 'KONFITUE', 'KONF.', 'BROTAUFSTRICH',
+        'IMKER HONIG', 'BLUETENHONIG', 'GEBIRGSBL.HONIG', 'SALBEI-HONIG'
+    ],
+    
+    'Gewürze & Saucen': [
+        // Gewürze
+        'GEWUERZE', 'PFEFFER', 'CURRY', 'PAPRIKA', 'CHILI', 'BASILIKUM',
+        'ROSMARIN', 'KRAEUTER', 'ZWIEBEL-KRAEUTER', 'GARTENKR', 'CURRY PULVER',
+        'CHILIPULVER', 'PFEFFER SCHWARZ', 'SWEET PAPRIKA', 'SESAM',
+        
+        // Saucen & Dressings
+        'KETCHUP', 'MAYONNAISE', 'SENF', 'BBQ SAUCE', 'REMOULADE', 'MIRACEL WHIP',
+        'SALAT MAYONNAISE', 'KNOBLAUCHSAUCE', 'SCHASCHLIKSAUCE', 'COCKTAILSAUCE',
+        'TOMATENKETCHUP', 'TOMATO KETCHUP', 'KNOBL. SAUCE', 'SAUCE ZU BRATEN',
+        
+        // Brühen & Würzmittel
+        'BOUILLON', 'BRUEHE', 'MAGGI', 'DELI. BRUEHE', 'GEMUESE BOUILLON',
+        'HUEHNERSUPPE', 'CLASSIC WUERFEL', 'SK BLOCK KRAEUT'
+    ],
+    
+    'Fertiggerichte & Konserven': [
+        'PIZZA', 'FISCHSTAEBCHEN', 'CHICKEN NUGGETS', 'SCHUPFNUDELN',
+        'RAVIOLI', 'GOLDMAIS', 'ERBSEN', 'MAIS', 'ZUCKERMAIS', 'ERBSEN MOEHRCHEN',
+        'ERBSEN M.KAROTT', 'TOMATEN DOSE', 'SCHAELTOMATEN', 'PASSIERTE TOMATE',
+        'STUECKIGE TOMATE', 'SAUERKRAUT', 'GURKEN', 'BOHNEN', 'LINSEN DOSE',
+        'KICHERERBSEN', 'CHAMPIGNONS DOSE', 'THUNFISCH', 'SARDINEN', 'HERINGSFILET',
+        'ANANAS DOSE', 'ANANASSCHEIBEN', 'ANANAS CHUNKS', 'NUDELN IN TOMAT',
+        'MIN HUHN NU', 'GEMUESE RAVIOLI', 'GNOCCHI', 'REIBEKUCHENTEIG'
+    ],
+    
+    'Fisch & Meeresfrüchte': [
+        'LACHS', 'FORELLE', 'THUNFISCH', 'GARNELE', 'KRABBEN', 'MUSCHELN',
+        'TINTENFISCH', 'KABELJAU', 'SEELACHS', 'HERING', 'MAKRELE', 'SARDINE',
+        'FISCHFILET', 'RAEUCHERLACHS', 'MATJES', 'ROLLMOPS', 'BISMARCKHERING',
+        'LIEBLINGS LACHS', 'MEIN LIEB. LACHS', 'RAEUCHER-LACHS', 'RAEUCHERL',
+        'BIO RAEUCHERLACH', 'AUSLESE CLASSIC'
+    ],
+    
+    'Haushalt & Hygiene': [
+        // Hygieneartikel
+        'ALWAYS', 'SENSODYNE', 'ZAHNPASTA', 'SHAMPOO', 'DUSCHE', 'SEIFE',
+        'DEO', 'RASIERER', 'GILLETTE', 'PFLEGEDUSCHE', 'MUNDWASSER', 'MUNDSPUELUNG',
+        'ZAHNSEIDE', 'HANDCREME', 'BODYLOTION', 'GESICHTSCREME', 'WATTESTAEBCHEN',
+        'FEUCHTTUCH', 'MEN EXPERT', 'KNEIPP', 'SCHAUMBAD', 'TRAUMBAD',
+        'KINDERZAHNP', 'KINDERZAHNB', 'KINDER SHAMPOO', 'L OREAL',
+        
+        // Babyartikel
+        'PENATEN', 'PAMPERS', 'WINDELN', 'BUEB.BABY', 'BP PANTS', 'SP PANTS',
+        'FEUCHTTUCH SENS',
+        
+        // Putzmittel
+        'TOILETTENPAP', 'KUECHENTUECHER', 'MUELLBTL', 'REINIGER', 'SPUELMITTEL',
+        'WASCHMITTEL', 'SCHWAMM', 'PRIL', 'HYGIENE REINIGER', 'WC REIN',
+        'SAGROTAN', 'MR.PROPER', 'DOM. WCS', 'TOPFREINIGER', 'ENTKALKER',
+        'REINIGER PASTE', 'MASCHINENT. REIN', 'FENSTERTUCH', 'JEANS-BL TUECHER',
+        'LUXUS TOILET.PAP', 'ZEWA'
+    ],
+    
+    'Tiefkühl': [
+        'TK-', 'TIEFKUEHL', 'EISBERGSALAT TK', 'SPINAT TK', 'ERBSEN TK',
+        'POMMES', 'KROKETTEN', 'FISCHFILET TK', 'GARNELEN TK', 'BEEREN TK',
+        'GEMUESE TK', 'KRAEUTERMIX TK', 'FERTIGGERICHT TK', 'EIS', 'SPEISEEIS',
+        'TK BEERENMISCH', 'FREIBAD POMMMES', 'SUESSK. POMMES'
+    ],
+    
+    'Babynahrung': [
+        'KAROT.KART.RIND', 'FR.KAROTT+KARTOF', 'BABYGLAS', 'HIPP', 'ALETE',
+        'BEBIVITA', 'BABYBREI', 'FOLGEMILCH', 'ANFANGSMILCH', 'BABYKEKS',
+        'BAN.APF.ERD.H', 'BAN.,ERDB.,QUIN.', 'RG BIRNE PFL.BR.'
+    ],
+    
+    'Pfand': [
+        'PFAND', 'LEERG', 'EINWEG', 'MEHRWEG'
+    ],
+    
+    'Asiatische Produkte': [
+        'NORI', 'GOMA', 'SUSHI', 'MAKI', 'FUTO', 'CAL.', 'WASABI', 'SOJA',
+        'ASIA.', 'ASIATISCH'
+    ],
+    
+    'Non-Food': [
+        // Spielwaren
+        'PISTENRAUPE', 'BETONMISCHER', 'SCHORNSTEINFEGER', 'DICKER BRUMMER',
+        'ZOO', 'TRAUMBAD', 'GARTENZWERGE',
+        
+        // Bürobedarf
+        'FRIXION', 'FASERMALER', 'STIFT', 'KERZE',
+        
+        // Haushaltswaren
+        'DOSENOEFFNER', 'GR. PAPIERTASCHE', 'KL.PAPIERTASCHE', 'PERMA-TASCHE',
+        'PARTYKERZEN', 'TOUCH&FRESH', 'GLADE',
+        
+        // Diverses
+        'W.RIESE COLOR', 'COLOR PULVER', 'UNIVERSAL PULVER', 'ROLLER EXTREME',
+        'ZAUBERFLEKS', 'MINI CLASSIC', 'FITNESSMISCHUNG', 'AKUT GEL',
+        'SONNENSPRAY KIDS', 'MATT-PASTE', 'AIRWAVES', 'EXTRA PROF',
+        'EASYLIFE', 'NATUREL.MINI', 'MOUSSE', 'GRAND DESS', 'FRUCHT FLIP',
+        'STRACCIATELLA', 'TRULLI', 'BION.', 'SCHLEFI', 'GREVENSTEINER',
+        'MINIS PUR', 'BECHERGL', 'NATURALS', 'MIWA PURE', 'GRILLMAISBBQ',
+        'FITNESS MISCHUNG', 'BUNTER MIX', 'TOTAL CARE', 'SH FOR MEN',
+        'SH&D SPORTSFREU', 'KRAFT-GEL', 'WC-STEIN', 'SPUELMASCH.PFL.',
+        'GSM CLASSIC', 'NB GR.1 NEWB', 'SP NB GR.1 NEWB', 'ALL IN 1 EXTRA',
+        'WC AKTIVGEL', 'N2 GARTENZWERGE', 'SCHMIRGEL', '2IN1 DUSCHE',
+        'ERF.GETR.MATE', 'NUSS-MIX DOSE'
+    ],
+    
+    'Sonstiges': []  // Nur für wirklich nicht kategorisierbare Artikel
+};
+
 
         // Initialize the app
         window.onload = function() {
@@ -1185,56 +1337,73 @@
             return receipt;
         }
 
-        function categorizeProduct(productName) {
-            const upperName = productName.toUpperCase();
-            
-            for (const [category, keywords] of Object.entries(categoryMapping)) {
-                if (keywords.some(keyword => upperName.includes(keyword))) {
-                    return category;
-                }
+// Hilfsfunktion zur besseren Kategorisierung
+function categorizeProduct(productName) {
+    const upperName = productName.toUpperCase();
+    
+    // Gehe alle Kategorien durch (außer "Sonstiges")
+    for (const [category, keywords] of Object.entries(improvedCategoryMapping)) {
+        if (category === 'Sonstiges') continue;
+        
+        // Prüfe ob eines der Keywords im Produktnamen enthalten ist
+        for (const keyword of keywords) {
+            if (upperName.includes(keyword)) {
+                return category;
             }
-            
-            return 'Sonstiges';
         }
+    }
+    
+    // Zusätzliche Logik für zusammengesetzte Produkte
+    // (z.B. "ORANGE SAFT 2,99 B BERGBAUERNMI 3,5 1,49 B DINKELMEHL T1050")
+    if (upperName.includes('DINKELMEHL') || upperName.includes('D DINKEL')) {
+        return 'Backwaren';
+    }
+    if (upperName.includes('BERGBAUERNMI')) {
+        return 'Milchprodukte';
+    }
+    if (upperName.includes('ORANGE SAFT') || upperName.includes('APFELSAFT')) {
+        return 'Getränke';
+    }
+    
+    // Spezielle Muster erkennen
+    if (upperName.match(/\d+ER\s+(BUNTE\s+)?EIER/)) {
+        return 'Grundnahrungsmittel'; // Eier
+    }
+    if (upperName.includes('EURO') && upperName.includes('PFAND')) {
+        return 'Pfand';
+    }
+    
+    // Falls nichts gefunden wurde
+    return 'Sonstiges';
+}
 
-        function processProducts() {
-            allProducts = [];
-            const productMap = {};
+// Beispiel-Test mit einigen Produkten aus der Liste
+const testProducts = [
+    'CAFFE CREMA CLA.',
+    'EDUSCHO CAFFEE',
+    'QUALITA ROSSA',
+    'DALLMAYR CLASSIC',
+    'NESCAFE CLASSIC',
+    'TROPISCHE MISCH.',
+    'W.RIESE COLOR',
+    'DIB BLUETENHONIG',
+    'KINDERJOG.HIMBEE',
+    'DUPLO BIG PACK',
+    'KETCHUP',
+    'SENF MITTELSCHAR',
+    'CURRY PULVER'
+];
 
-            allReceipts.forEach(receipt => {
-                receipt.items.forEach(item => {
-                    if (!productMap[item.name]) {
-                        productMap[item.name] = {
-                            name: item.name,
-                            category: item.category || categorizeProduct(item.name),
-                            purchases: [],
-                            totalQuantity: 0,
-                            totalSpent: 0
-                        };
-                    }
-                    
-                    productMap[item.name].purchases.push({
-                        date: receipt.date,
-                        price: item.price,
-                        quantity: item.quantity || 1,
-                        unitPrice: (item.quantity || 1) > 0 ? item.price / (item.quantity || 1) : item.price
-                    });
-                    
-                    productMap[item.name].totalQuantity += (item.quantity || 1);
-                    productMap[item.name].totalSpent += item.price;
-                });
-            });
+console.log('Test der verbesserten Kategorisierung:\n');
+testProducts.forEach(product => {
+    const category = categorizeProduct(product);
+    console.log(`${product.padEnd(25)} → ${category}`);
+});
 
-            allProducts = Object.values(productMap);
-            
-            // Update product categories
-            allProducts.forEach(product => {
-                productCategories[product.name] = product.category;
-            });
-            
-            updateCategoryFilter();
-        }
-
+// Export für die HTML-Datei
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { improvedCategoryMapping, categorizeProduct };
+}
         function loadStoredData() {
             const storedData = localStorage.getItem('reweEbonData');
             if (storedData) {
